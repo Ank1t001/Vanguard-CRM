@@ -2,15 +2,17 @@
 //
 // This is the ONLY file that knows the data lives in a Google Sheet. The rest
 // of the app talks to it through these functions:
-//   context, listLeads, update, updateMany, addLead, log, activity
+//   context, listLeads, listUnassigned, update, updateMany, addLead, log, activity
 // Moving to Supabase later means writing lib/store/supabase.js with the same
 // functions and changing one import in lib/crm.js.
 
 import { JWT } from 'google-auth-library';
 import {
   SOURCE_TABS, TAB_LOCATION, ADD_LEAD_TAB, LOCATIONS, STAGES,
-  ACTIVITY_TAB, STAFF_TAB, SETTINGS_TAB, FIELD_HEADERS, defaultSettingsMap
+  ACTIVITY_TAB, STAFF_TAB, SETTINGS_TAB, FIELD_HEADERS, INTAKE_HEADERS, CLEARED, defaultSettingsMap
 } from '../config.js';
+import { normPhone } from '../phone.js';
+import { privateKey } from '../env.js';
 import { parseTs, fmtLocal } from '../tz.js';
 import { AppError } from '../errors.js';
 
@@ -20,7 +22,7 @@ let jwt;
 function auth() {
   if (!jwt) {
     const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-    const key = (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+    const key = privateKey();
     if (!email || !key || !process.env.SHEET_ID) throw new AppError('setup', 'The sheet connection is not configured on the server.', 500);
     jwt = new JWT({ email, key, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
   }
@@ -59,7 +61,7 @@ async function batchGet(ranges) {
   return (out.valueRanges || []).map(v => v.values || []);
 }
 
-function headerIndex(row) {
+export function headerIndex(row) {
   const idx = {};
   (row || []).forEach((h, i) => { const k = String(h).trim().toLowerCase(); if (k && !(k in idx)) idx[k] = i; });
   return idx;
@@ -103,13 +105,6 @@ export async function context() {
 
 /* ---------------- Leads ---------------- */
 
-function normPhone(v) {
-  const digits = String(v ?? '').replace(/^p:/i, '').replace(/\D/g, '');
-  if (digits.length === 10) return '+1' + digits;
-  if (digits.length === 11 && digits[0] === '1') return '+' + digits;
-  return digits ? '+' + digits : '';
-}
-
 function normLocation(v) {
   const s = String(v || '').toLowerCase();
   if (s.includes('georgetown')) return 'Georgetown';
@@ -122,19 +117,38 @@ function prettyReason(v) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 }
 
-function leadFromRow(tab, idx, row, rowNumber) {
+export function leadFromRow(tab, idx, row, rowNumber) {
   const g = h => { const i = idx[h.toLowerCase()]; return i === undefined ? '' : (row[i] ?? ''); };
   const f = key => g(FIELD_HEADERS[key]);
   const reasonKey = Object.keys(idx).find(k => k.startsWith('what_would_you_like'));
   const stageRaw = String(f('stage') || '');
+  // What intake recorded. These columns are never overwritten by the CRM.
+  const original = {
+    firstName: String(g('First Name') || g('first_name') || '').trim(),
+    lastName: String(g('Last Name') || g('last_name') || '').trim(),
+    email: String(g('Email') || g('email') || '').trim(),
+    phone: normPhone(g('Phone') || g('phone_number'))
+  };
+  // A correction made in the CRM wins over intake; CLEARED means "blank on purpose".
+  const effective = (key, field, tidy = v => v) => {
+    const e = String(f(key) ?? '').trim();
+    return e === CLEARED ? '' : (e ? tidy(e) : original[field]);
+  };
+  const edited = {
+    firstName: effective('editedFirstName', 'firstName'),
+    lastName: effective('editedLastName', 'lastName'),
+    email: effective('editedEmail', 'email'),
+    phone: effective('editedPhone', 'phone', normPhone)
+  };
   return {
     ref: { tab, row: rowNumber, idx },
     id: String(f('id') || ''),
     duplicateOf: String(f('duplicateOf') || ''),
-    firstName: String(g('First Name') || g('first_name') || '').trim(),
-    lastName: String(g('Last Name') || g('last_name') || '').trim(),
-    email: String(g('Email') || g('email') || '').trim(),
-    phone: normPhone(g('Phone') || g('phone_number')),
+    ...edited,
+    original,
+    detailsEdited: Object.keys(original).some(k => original[k] !== edited[k]),
+    campaign: String(g('UTM Campaign') || g('campaign_name') || g('campaign') || '').trim(),
+    assignedAt: parseTs(f('assignedAt')),
     reason: prettyReason(g('Reason') || (reasonKey ? row[idx[reasonKey]] : '')),
     source: String(g('Source') || g('source') || '').trim(),
     channel: String(g('Lead Channel') || '').trim(),
@@ -170,7 +184,7 @@ function isTest(lead, excluded) {
 
 export function newId(loc) {
   const rand = globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase();
-  return (loc === 'Hanover' ? 'HN-' : 'GT-') + rand;
+  return (loc === 'Hanover' ? 'HN-' : loc === 'Georgetown' ? 'GT-' : 'WB-') + rand;
 }
 
 // Every lead for one location, including untouched duplicates (crm.js decides
@@ -194,13 +208,32 @@ export async function listLeads(loc, settings) {
   return leads;
 }
 
+// Website Leads rows whose Location is blank or not a known site. Only an Admin
+// sees these, and assigning one writes the Location column.
+export async function listUnassigned(settings) {
+  const excluded = String(settings.EXCLUDE_EMAILS || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+  const tab = 'Website Leads';
+  const [rows] = await batchGet([quote(tab)]);
+  const idx = headerIndex(rows[0]);
+  const leads = [];
+  const newIds = [];
+  for (let r = 1; r < (rows || []).length; r++) {
+    const lead = leadFromRow(tab, idx, rows[r], r + 1);
+    if (lead.location || isTest(lead, excluded)) continue;
+    if (!lead.id) { lead.id = newId(''); newIds.push({ lead, fields: { id: lead.id } }); }
+    leads.push(lead);
+  }
+  if (newIds.length) await updateMany(newIds, null);
+  return leads;
+}
+
 // fields use semantic names from FIELD_HEADERS. staffName null = no audit stamp.
 export async function updateMany(items, staffName) {
   const data = [];
   for (const { lead, fields } of items) {
     const all = staffName ? { ...fields, updatedAt: new Date(), updatedBy: staffName } : fields;
     for (const [key, value] of Object.entries(all)) {
-      const header = FIELD_HEADERS[key];
+      const header = FIELD_HEADERS[key] ?? INTAKE_HEADERS[key];
       const col = header === undefined ? undefined : lead.ref.idx[header.toLowerCase()];
       if (col === undefined) throw new AppError('setup', `Column "${header || key}" is missing in ${lead.ref.tab}. Run npm run setup.`, 500);
       data.push({ range: `${quote(lead.ref.tab)}!${colLetter(col)}${lead.ref.row}`, values: [[cellValue(value)]] });
@@ -247,7 +280,7 @@ export async function addLead(loc, input, staffName) {
 
 export async function log(entries) {
   if (!entries.length) return;
-  const values = entries.map(e => [fmtLocal(new Date()), e.id, e.location, e.staff, e.action, e.from || '', e.to || '', cellValue(e.detail || '')]);
+  const values = entries.map(e => [fmtLocal(new Date()), e.id, e.location, e.staff, e.action, cellValue(e.from || ''), cellValue(e.to || ''), cellValue(e.detail || '')]);
   await sheetsApi(`/values/${encodeURIComponent(quote(ACTIVITY_TAB) + '!A:H')}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
     method: 'POST', body: JSON.stringify({ values })
   });

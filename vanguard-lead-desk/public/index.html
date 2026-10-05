@@ -179,6 +179,27 @@ dialog.dlg::backdrop{background:rgba(17,24,39,.45)}
 .toast{position:sticky; bottom:calc(16px + env(safe-area-inset-bottom,0px)); margin:0 auto; width:max-content; max-width:92vw; background:var(--ink); color:var(--panel); padding:10px 16px; border-radius:10px; font-weight:600; z-index:20}
 .toast.err{background:var(--red); color:#fff}
 
+/* Search, report, unassigned */
+.search{flex:1 1 240px; min-width:200px; max-width:340px; border:1px solid var(--line-2); border-radius:8px; padding:7px 10px; background:var(--bg)}
+.form .two{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.form .actions{display:flex; gap:8px}
+.page{padding:18px 24px 28px; display:grid; gap:18px; max-width:1100px}
+.page h2{font:600 24px/1.2 var(--serif); margin:0}
+.page .sub{color:var(--ink-2); margin:4px 0 0; font-size:14px}
+.weeknav{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 20px}
+.card h3{font:600 20px/1.2 var(--serif); margin:0 0 12px}
+.kpis{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px 18px; margin:0}
+.kpis dt{font-size:13px; color:var(--ink-3)}
+.kpis dd{margin:2px 0 0; font:600 24px/1.1 var(--serif)}
+.kpis dd small{display:block; font:400 12.5px/1.3 var(--sans); color:var(--ink-2); margin-top:2px}
+.tbl{width:100%; border-collapse:collapse; font-size:14px; margin-top:6px}
+.tbl th,.tbl td{text-align:left; padding:6px 10px 6px 0; border-bottom:1px solid var(--line)}
+.tbl th{font-weight:600; color:var(--ink-3); font-size:13px}
+.tbl td.n,.tbl th.n{text-align:right}
+.ucard{display:flex; gap:14px; align-items:center; justify-content:space-between; flex-wrap:wrap; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 18px}
+.ucard .who2{min-width:220px}
+.ucard .actions{display:flex; gap:8px}
 @media (max-width: 1100px){
   .path{grid-template-columns:repeat(3,1fr); row-gap:6px}
   .seg,.seg:first-child{clip-path:none; margin-left:0; border:1px solid var(--line); border-radius:10px; min-height:auto}
@@ -246,8 +267,10 @@ const STEP_LABEL = {
 const DAYNAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const S = {
-  token: null, me: null, location: null, leads: [], filter: 'queue', selected: null,
-  detail: null, activity: [], step: null, busy: false, error: ''
+  me: null, location: null, leads: [], filter: 'queue', selected: null,
+  detail: null, activity: [], step: null, busy: false, error: '',
+  view: 'leads', q: '', results: null, searchMsg: '', team: [], editing: false,
+  unassigned: null, report: null
 };
 
 /* ---------------- Utilities ---------------- */
@@ -355,6 +378,7 @@ function doctorWarning(loc, value) {
 }
 
 /* ---------------- API ---------------- */
+// Identity is the session cookie (HttpOnly, so this page cannot read it).
 async function api(action, payload) {
   if (DEMO) return demoApi(action, payload || {});
   let out;
@@ -362,14 +386,19 @@ async function api(action, payload) {
     const res = await fetch('/api/crm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(Object.assign({ action, token: S.token, location: S.location }, payload || {}))
+      credentials: 'same-origin',
+      body: JSON.stringify(Object.assign({ action, location: S.location }, payload || {}))
     });
     out = await res.json();
   } catch (e) {
     throw new Error('Could not reach the server. Check your connection and try again.');
   }
   if (!out.ok) {
-    if (out.error === 'signin' || out.error === 'not-approved') { signOut(out.message); throw new Error(out.message); }
+    if (out.error === 'signin' || out.error === 'not-approved') {
+      const quiet = !S.me && out.error === 'signin';   // first visit: nobody signed in yet
+      signOut(quiet ? '' : out.message);
+      throw new Error(out.message);
+    }
     throw new Error(out.message || 'Request failed.');
   }
   return out.data;
@@ -439,8 +468,15 @@ async function demoApi(action, p) {
   if (action === 'open') {
     const l = find(p.id);
     if (!l.firstOpenedAt) { l.firstOpenedAt = new Date().toISOString(); l.firstOpenedBy = S.me.name; touch(l); demoLog(l, 'Opened'); }
-    return { lead: demoOut(l), activity: DB.activity[l.id] || [] };
+    return { lead: demoOut(l), activity: DB.activity[l.id] || [], team: [] };
   }
+  if (action === 'search') {
+    const q = String(p.q || '').trim().toLowerCase(), digits = q.replace(/\D/g, '');
+    if (q.length < 2) throw new Error('Type at least 2 letters.');
+    const hits = DB.leads.filter(l => l.location === loc && (digits.length >= 3 && /^[\d\s()+.\-]+$/.test(q) ? l.phone.replace(/\D/g, '').includes(digits.replace(/^1(?=\d{10})/, '')) : (fullName(l) + ' ' + l.email).toLowerCase().includes(q)));
+    return { leads: hits.map(demoOut), total: hits.length };
+  }
+  if (['editDetails', 'reassign', 'unassigned', 'assign', 'report'].includes(action)) throw new Error('That is not available in the demo.');
   if (action === 'dial') {
     const l = find(p.id), n = nextCall(l);
     if (['New', 'Calling'].includes(l.stage) && n <= 3 && !l.calls[n - 1].at) { l.calls[n - 1].at = new Date().toISOString(); demoLog(l, 'Call ' + n + ' started', '', '', l.phone); }
@@ -509,7 +545,7 @@ function renderGate(msg) {
     '<p>Sign in with the Google account your manager approved.</p><div id="gsi"></div>' +
     (msg ? '<p class="err">' + esc(msg) + '</p>' : '') + '</div></main>';
   const go = () => {
-    google.accounts.id.initialize({ client_id: CONFIG.GOOGLE_CLIENT_ID, callback: r => { S.token = r.credential; boot(); }, auto_select: false });
+    google.accounts.id.initialize({ client_id: CONFIG.GOOGLE_CLIENT_ID, callback: signIn, auto_select: false });
     google.accounts.id.renderButton($('#gsi'), { theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular' });
   };
   if (window.google && google.accounts) go();
@@ -519,10 +555,26 @@ function renderGate(msg) {
     document.head.appendChild(s);
   }
 }
+// Google's token is used once, here. The server answers with its own session cookie.
+async function signIn(r) {
+  try {
+    const res = await fetch('/api/session', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+      body: JSON.stringify({ credential: r.credential })
+    });
+    const out = await res.json();
+    if (!out.ok) return renderGate(out.message || 'Sign-in failed.');
+    boot();
+  } catch (e) { renderGate('Could not reach the server. Check your connection and try again.'); }
+}
 function signOut(msg) {
-  S.token = null; S.me = null; S.leads = []; S.selected = null; S.detail = null;
-  clearInterval(boot.poll); clearInterval(boot.tick);
-  if (!DEMO && window.google && google.accounts) google.accounts.id.disableAutoSelect();
+  const wasIn = !!S.me;
+  Object.assign(S, { me: null, leads: [], selected: null, detail: null, activity: [], team: [], q: '', results: null, view: 'leads', filter: 'queue', unassigned: null, report: null, editing: false, step: null });
+  clearInterval(boot.poll); clearTimeout(boot.tick); clearTimeout(idleTimer);
+  if (!DEMO) {
+    if (wasIn) fetch('/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ action: 'logout' }) }).catch(() => {});
+    if (window.google && google.accounts) google.accounts.id.disableAutoSelect();
+  }
   renderGate(msg);
 }
 let idleTimer;
@@ -544,16 +596,17 @@ async function boot(demoLoc) {
       S.location = S.me.location;
     }
     await loadList();
+    if (S.me && S.me.isAdmin) loadUnassigned(true);
     resetIdle();
     clearInterval(boot.tick); boot.tick = setTimeout(function tick() { render(); boot.tick = setTimeout(tick, 30000); }, 30000);
     if (!DEMO) { clearInterval(boot.poll); boot.poll = setInterval(() => loadList(true), CONFIG.REFRESH_SECONDS * 1000); }
   } catch (e) {
-    if (S.token || DEMO) renderGate(e.message);
+    if (DEMO || !$('.gate')) renderGate(e.message);
   }
 }
 async function loadList(quiet) {
   try {
-    const out = await api('list');
+    const out = await api('list', quiet ? { background: true } : {});
     S.leads = out.leads;
     render();
   } catch (e) { if (!quiet) toast(e.message, true); }
@@ -604,33 +657,107 @@ function stats() {
 /* ---------------- Render ---------------- */
 function render() {
   if (!S.me) return;
-  const c = counts(), st = stats();
-  const title = S.filter === 'queue' ? 'Call now' : S.filter;
-  const leads = visibleLeads();
+  const qEl = document.activeElement && document.activeElement.id === 'q' ? document.activeElement : null;
+  const caret = qEl ? [qEl.selectionStart, qEl.selectionEnd] : null;
+  const main = S.view === 'unassigned' ? unassignedHtml() : S.view === 'report' ? reportHtml() : leadsHtml();
+  $('#app').innerHTML = barHtml() + main;
+  if (caret) { const el = $('#q'); if (el) { el.focus(); try { el.setSelectionRange(caret[0], caret[1]); } catch (e) { /* ignore */ } } }
+}
+function barHtml() {
   const locCtl = S.me.canSwitch
     ? '<span class="loc"><label class="sr" for="locsel">Location</label><select id="locsel">' + S.me.locations.map(x => '<option' + (x === S.location ? ' selected' : '') + '>' + x + '</option>').join('') + '</select></span>'
     : '<span class="loc">' + esc(S.location) + '</span>';
-
-  $('#app').innerHTML =
-    '<header class="bar"><span class="brand">Vanguard lead desk</span>' + locCtl +
+  const nU = S.unassigned ? S.unassigned.length : 0;
+  return '<header class="bar"><span class="brand">Vanguard lead desk</span>' + locCtl +
+    '<label class="sr" for="q">Search leads</label><input id="q" class="search" type="search" placeholder="Search name, phone, email" autocomplete="off" value="' + esc(S.q) + '">' +
     (DEMO ? '<span class="demo-flag">Demo, sample data</span>' : '') +
     '<span class="spacer"></span><span class="who">' + esc(S.me.name) + '</span>' +
-    '<button class="btn" data-act="add">Add lead</button><button class="btn ghost" data-act="signout">Sign out</button></header>' +
-
-    '<nav class="rail" aria-label="Lead funnel"><div class="path">' +
+    (S.me.isAdmin ? '<button class="btn small' + (S.view === 'unassigned' ? ' primary' : '') + '" data-view="unassigned">Unassigned' + (nU ? ' (' + nU + ')' : '') + '</button>' +
+      '<button class="btn small' + (S.view === 'report' ? ' primary' : '') + '" data-view="report">Report</button>' : '') +
+    (S.view !== 'leads' ? '<button class="btn small" data-view="leads">Back to leads</button>' : '') +
+    '<button class="btn" data-act="add">Add lead</button><button class="btn ghost" data-act="signout">Sign out</button></header>';
+}
+function leadsHtml() {
+  const c = counts(), st = stats();
+  const searching = S.q.trim().length > 0;
+  const title = searching ? 'Search results' : S.filter === 'queue' ? 'Call now' : S.filter;
+  const leads = searching ? (S.results || []) : visibleLeads();
+  const sub = searching ? (S.searchMsg || (S.results ? S.results.length + (S.results.length === 1 ? ' lead' : ' leads') + ' in ' + S.location + ', every stage.' : 'Searching ' + S.location + '...')) : RULES[S.filter];
+  return '<nav class="rail" aria-label="Lead funnel"><div class="path">' +
       seg('queue', 'Call now', c.queue, RULES.queue, true) +
       MAIN_PATH.map(s => seg(s, s, c[s], RULES[s])).join('') +
     '</div><div class="side">' + SIDE.map(s => pill(s, c[s])).join('') + '</div></nav>' +
 
     '<div class="work"><section class="list" aria-label="' + esc(title) + '">' +
-      '<div class="list-head"><h2>' + esc(title) + '</h2><p>' + esc(RULES[S.filter]) + '</p>' +
-        (S.filter === 'queue' ? '<div class="stats"><span class="stat' + (st.overdue ? ' bad' : '') + '"><b>' + st.overdue + '</b> overdue</span>' +
+      '<div class="list-head"><h2>' + esc(title) + '</h2><p>' + esc(sub) + '</p>' +
+        (!searching && S.filter === 'queue' ? '<div class="stats"><span class="stat' + (st.overdue ? ' bad' : '') + '"><b>' + st.overdue + '</b> overdue</span>' +
           '<span class="stat"><b>' + st.nextHour + '</b> due in the next hour</span>' +
           '<span class="stat"><b>' + st.onTime + '</b> call 1 on time, last 7 days</span></div>' : '') +
       '</div>' +
-      (leads.length ? '<ul class="rows">' + leads.map(rowHtml).join('') + '</ul>'
-        : '<div class="empty">' + (S.filter === 'queue' ? 'Nobody is due for a call right now. New leads will appear here as they arrive.' : 'No leads in ' + esc(S.filter) + ' right now.') + '</div>') +
+      (leads.length ? '<ul class="rows">' + leads.map(l => rowHtml(l, searching)).join('') + '</ul>'
+        : '<div class="empty">' + (searching ? (S.results ? 'Nobody in ' + esc(S.location) + ' matches that.' : '') : S.filter === 'queue' ? 'Nobody is due for a call right now. New leads will appear here as they arrive.' : 'No leads in ' + esc(S.filter) + ' right now.') + '</div>') +
     '</section>' + panelHtml() + '</div>';
+}
+
+/* Unassigned queue (Admin) */
+function unassignedHtml() {
+  const list = S.unassigned;
+  return '<main class="page"><div><h2>Unassigned leads</h2><p class="sub">Website leads that arrived without a location. Pick a site and the call 1 clock starts from that moment, not from when the form was sent.</p></div>' +
+    (list == null ? '<div class="empty">Loading...</div>' : !list.length ? '<div class="card">Nothing waiting. Every website lead has a location.</div>' :
+      list.map(l => '<div class="ucard"><div class="who2"><b>' + esc(fullName(l)) + '</b><div class="sub">' +
+        [l.phone ? phonePretty(l.phone) : '', l.email, l.reason, l.source, 'received ' + fmtWhen(l.created)].filter(Boolean).map(esc).join(', ') + '</div></div>' +
+        '<div class="actions"><span class="sr">Assign ' + esc(fullName(l)) + ' to</span>' +
+        ['Georgetown', 'Hanover'].map(x => '<button class="btn" data-assign="' + x + '" data-id="' + esc(l.id) + '">' + x + '</button>').join('') + '</div></div>').join('')) +
+    '</main>';
+}
+async function loadUnassigned(quiet) {
+  try { S.unassigned = (await api('unassigned', quiet ? { background: true } : {})).leads; if (S.me) render(); }
+  catch (e) { if (!quiet) toast(e.message, true); }
+}
+
+/* Owner's report (Admin) */
+const pct = x => x == null ? 'n/a' : Math.round(x * 100) + '%';
+const mins = m => m == null ? 'n/a' : m < 60 ? Math.round(m) + ' min' : Math.floor(m / 60) + ' h ' + Math.round(m % 60) + ' min';
+const dayLabel = ymd => new Date(ymd + 'T12:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+function shiftWeek(ymd, n) { const d = new Date(ymd + 'T12:00:00'); d.setDate(d.getDate() + 7 * n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function reportHtml() {
+  const r = S.report;
+  if (!r) return '<main class="page"><div class="empty">Loading the report...</div></main>';
+  const isNow = r.weekStart >= r.currentWeekStart;
+  const kpi = (t, v, small) => '<div><dt>' + esc(t) + '</dt><dd>' + esc(v) + (small ? '<small>' + esc(small) + '</small>' : '') + '</dd></div>';
+  return '<main class="page"><div><h2>Owner\'s report</h2><p class="sub">Leads are counted in the week they arrived (or were assigned to a site). Times are Toronto time.</p></div>' +
+    '<div class="weeknav"><button class="btn small" data-week="' + shiftWeek(r.weekStart, -1) + '">Previous week</button>' +
+    '<b>' + esc(dayLabel(r.weekStart)) + ' to ' + esc(dayLabel(r.weekEnd)) + (isNow ? ' (this week so far)' : '') + '</b>' +
+    '<button class="btn small" data-week="' + shiftWeek(r.weekStart, 1) + '"' + (isNow ? ' disabled' : '') + '>Next week</button>' +
+    (isNow ? '' : '<button class="btn small" data-week="">This week</button>') + '</div>' +
+    r.locations.map(x => '<section class="card" aria-label="' + esc(x.location) + '"><h3>' + esc(x.location) + '</h3><dl class="kpis">' +
+      kpi('Leads', x.leads) +
+      kpi('Median time to first call', mins(x.medianMinutesToFirstCall), 'from arrival to call 1 dialled') +
+      kpi('Call 1 on time', pct(x.call1.rate), x.call1.onTime + ' of ' + x.call1.of + ' that were due') +
+      kpi('Contact rate', pct(x.contact.rate), x.contact.count + ' spoke to them') +
+      kpi('Marketing only rate', pct(x.marketingOnly.rate), x.marketingOnly.count + ' unanswered after 3 calls') +
+      kpi('Booked', pct(x.booked.rate), x.booked.count + ' of ' + x.leads + ' leads') +
+      kpi('No-show rate', pct(x.noShow.rate), x.noShow.count + ' of ' + x.booked.count + ' booked') +
+      kpi('Registered rate', pct(x.registered.rate), x.registered.count + ' of ' + x.booked.count + ' booked') +
+      '</dl>' +
+      '<h3 style="margin-top:20px">Lost reasons</h3>' + (x.lostReasons.length ? '<table class="tbl"><tbody>' + x.lostReasons.map(l => '<tr><td>' + esc(l.reason) + '</td><td class="n">' + l.count + '</td></tr>').join('') + '</tbody></table>' : '<p class="sub">No leads closed as lost.</p>') +
+      '<h3 style="margin-top:20px">Lead quality by campaign</h3>' + (x.qualityByCampaign.length ? '<table class="tbl"><thead><tr><th>Campaign</th><th class="n">Leads</th><th class="n">Good</th><th class="n">OK</th><th class="n">Poor</th><th class="n">Not rated</th></tr></thead><tbody>' +
+        x.qualityByCampaign.map(c => '<tr><td>' + esc(c.campaign) + '</td><td class="n">' + c.total + '</td><td class="n">' + c.Good + '</td><td class="n">' + c.OK + '</td><td class="n">' + c.Poor + '</td><td class="n">' + c.unrated + '</td></tr>').join('') + '</tbody></table>' : '<p class="sub">No leads this week.</p>') +
+      '</section>').join('') + '</main>';
+}
+async function loadReport(weekStart) {
+  S.report = null; render();
+  try { S.report = await api('report', weekStart ? { weekStart } : {}); } catch (e) { toast(e.message, true); S.view = 'leads'; }
+  render();
+}
+
+/* Search */
+async function doSearch() {
+  const q = S.q.trim();
+  if (!q) { S.results = null; S.searchMsg = ''; return render(); }
+  try { const out = await api('search', { q }); if (q === S.q.trim()) { S.results = out.leads; S.searchMsg = ''; } }
+  catch (e) { if (q === S.q.trim()) { S.results = []; S.searchMsg = e.message; } }
+  render();
 }
 function seg(key, label, n, rule, isQueue) {
   return '<button class="seg' + (isQueue ? ' callnow' : '') + '" data-filter="' + esc(key) + '" aria-pressed="' + (S.filter === key) + '">' +
@@ -640,9 +767,9 @@ function pill(s, n) {
   return '<button class="pill" data-filter="' + esc(s) + '" aria-pressed="' + (S.filter === s) + '" title="' + esc(RULES[s]) + '">' +
     '<span class="n">' + n + '</span><span class="t">' + esc(s) + '</span><span class="r">' + esc(RULES[s]) + '</span></button>';
 }
-function rowHtml(l) {
+function rowHtml(l, showStage) {
   const meta = [l.reason, l.source, 'received ' + ago(l.created)].filter(Boolean).map(esc).join(', ');
-  const extra = (S.filter === 'queue' ? '' : '<span class="tag">' + esc(l.stage === 'Lost' && l.lostReason ? 'Lost: ' + l.lostReason : l.stage) + '</span>') +
+  const extra = (S.filter === 'queue' && !showStage ? '' : '<span class="tag">' + esc(l.stage === 'Lost' && l.lostReason ? 'Lost: ' + l.lostReason : l.stage) + '</span>') +
     (l.stage === 'Booked' && l.appointment ? '<span class="tag ok">Intake ' + fmtWhen(l.appointment) + '</span>' : '');
   return '<li><button class="row" data-open="' + esc(l.id) + '" aria-current="' + (S.selected === l.id) + '">' +
     '<div class="top"><span class="name">' + esc(fullName(l)) + '</span>' + dueChip(l) + '</div>' +
@@ -677,7 +804,12 @@ function panelHtml() {
     '<div class="p-body">' +
       '<div class="contact">' + (l.phone ? '<a class="dial" href="tel:' + esc(l.phone) + '" data-act="dial">Call ' + esc(phonePretty(l.phone)) + '</a>' : '') +
         (l.email ? '<a class="mail" href="mailto:' + esc(l.email) + '">' + esc(l.email) + '</a>' : '') + '</div>' +
+      '<div><button class="btn small" data-act="editdetails" aria-expanded="' + S.editing + '">' + (S.editing ? 'Cancel editing' : 'Edit details') + '</button></div>' +
+      (S.editing ? editForm(l) : '') +
+      (l.detailsEdited && l.original && !S.editing ? '<p class="hint" style="margin:0">Corrected in the CRM. Intake recorded: ' +
+        esc([[l.original.firstName, l.original.lastName].filter(Boolean).join(' '), l.original.phone ? phonePretty(l.original.phone) : '', l.original.email].filter(Boolean).join(', ') || 'nothing') + '.</p>' : '') +
       '<dl class="facts">' + facts.map(f => '<div><dt>' + esc(f[0]) + '</dt><dd>' + esc(f[1]) + '</dd></div>').join('') + '</dl>' +
+      reassignBlock(l) +
 
       (callable ? '<div class="block"><h3>Call ' + n + ' of 3</h3><p class="hint">' + (l.nextDue ? dueChip(l) + ' ' : '') +
         'How did it go?</p><div class="outcomes">' +
@@ -710,6 +842,23 @@ function panelHtml() {
         '<li><time>' + fmtWhen(a.at) + '</time>' + esc(a.staff) + ': ' + esc(a.action) + (a.to ? ' (' + esc(a.from ? a.from + ' to ' + a.to : a.to) + ')' : '') + (a.detail ? ', ' + esc(a.detail) : '') + '</li>').join('') + '</ul></div>' : '') +
     '</div></aside>';
 }
+function editForm(l) {
+  return '<div class="form" id="editform"><div class="two"><label>First name<input name="firstName" value="' + esc(l.firstName) + '" autocomplete="off"></label>' +
+    '<label>Last name<input name="lastName" value="' + esc(l.lastName) + '" autocomplete="off"></label></div>' +
+    '<label>Phone<input name="phone" type="tel" value="' + esc(l.phone ? phonePretty(l.phone) : '') + '" autocomplete="off"></label>' +
+    '<label>Email<input name="email" type="email" value="' + esc(l.email) + '" autocomplete="off"></label>' +
+    '<p class="hint" style="margin:0">What the form recorded is kept as it was. Your correction is saved beside it and logged in the activity list.</p>' +
+    '<div class="actions"><button class="btn primary" data-act="savedetails">Save details</button></div></div>';
+}
+function reassignBlock(l) {
+  if (!S.me.canReassign) return '';
+  const others = (S.team || []).filter(t => t.name !== l.owner);
+  if (!others.length) return '';
+  return '<div class="block"><h3>Owner</h3><p class="hint">' + (l.owner ? 'Currently ' + esc(l.owner) + '.' : 'Nobody owns this lead yet.') + '</p>' +
+    '<div class="actions" style="display:flex; gap:8px; flex-wrap:wrap"><label class="sr" for="reassign">Reassign to</label><select id="reassign" class="search" style="max-width:240px">' +
+    others.map(t => '<option value="' + esc(t.email) + '">' + esc(t.name) + '</option>').join('') + '</select>' +
+    '<button class="btn small" data-act="reassign">Reassign</button></div></div>';
+}
 function stepForm(l) {
   const s = S.step;
   if (!s) return '';
@@ -737,36 +886,53 @@ const warnHtml = w => w ? '<div class="warn">' + esc(w) + '</div>' : '';
 
 /* ---------------- Actions ---------------- */
 async function openLead(id) {
-  S.selected = id; S.step = null;
-  S.detail = S.leads.find(l => l.id === id) || null; S.activity = [];
+  S.selected = id; S.step = null; S.editing = false;
+  S.detail = S.leads.find(l => l.id === id) || (S.results || []).find(l => l.id === id) || null; S.activity = []; S.team = [];
   render();
   try {
     const out = await api('open', { id });
-    applyLead(out.lead); S.activity = out.activity || []; render();
+    applyLead(out.lead); S.activity = out.activity || []; S.team = out.team || []; render();
   } catch (e) { toast(e.message, true); }
 }
 function applyLead(lead) {
   const i = S.leads.findIndex(l => l.id === lead.id);
-  if (i === -1) S.leads.push(lead); else S.leads[i] = lead;
+  const j = (S.results || []).findIndex(l => l.id === lead.id);
+  if (j !== -1) S.results[j] = lead;
+  if (i !== -1) S.leads[i] = lead; else if (j === -1) S.leads.push(lead);
   if (S.selected === lead.id) S.detail = lead;
 }
 async function refreshActivity() {
   if (!S.selected) return;
-  try { const out = await api('open', { id: S.selected }); applyLead(out.lead); S.activity = out.activity || []; } catch (e) { /* keep current */ }
+  try { const out = await api('open', { id: S.selected }); applyLead(out.lead); S.activity = out.activity || []; S.team = out.team || []; } catch (e) { /* keep current */ }
 }
 async function run(fn, okMsg) {
   if (S.busy) return;
   S.busy = true;
-  try { const out = await fn(); if (out && out.lead) applyLead(out.lead); await refreshActivity(); S.step = null; render(); if (okMsg) toast(okMsg); }
+  try { const out = await fn(); if (out && out.lead) applyLead(out.lead); await refreshActivity(); S.step = null; S.editing = false; render(); if (okMsg) toast(okMsg); }
   catch (e) { toast(e.message, true); }
   finally { S.busy = false; }
 }
 
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-demo],[data-filter],[data-open],[data-act],[data-outcome],[data-step],[data-confirm],[data-quality]');
+  const t = e.target.closest('[data-demo],[data-filter],[data-open],[data-act],[data-outcome],[data-step],[data-confirm],[data-quality],[data-view],[data-week],[data-assign]');
   if (!t) return;
   if (t.dataset.demo) return boot(t.dataset.demo);
-  if (t.dataset.filter) { S.filter = t.dataset.filter; render(); return; }
+  if (t.dataset.filter) { S.filter = t.dataset.filter; S.q = ''; S.results = null; S.searchMsg = ''; S.view = 'leads'; render(); return; }
+  if (t.dataset.view) {
+    S.view = t.dataset.view;
+    if (S.view === 'unassigned') { render(); loadUnassigned(); }
+    else if (S.view === 'report') loadReport();
+    else render();
+    return;
+  }
+  if (t.dataset.week !== undefined && t.tagName === 'BUTTON' && !t.disabled) return loadReport(t.dataset.week);
+  if (t.dataset.assign) {
+    if (S.busy) return;
+    S.busy = true;
+    const to = t.dataset.assign, id = t.dataset.id;
+    return api('assign', { id, to }).then(() => { toast('Assigned to ' + to + '. The call 1 clock starts now.'); return loadUnassigned(true); })
+      .catch(err => { toast(err.message, true); return loadUnassigned(true); }).finally(() => { S.busy = false; });
+  }
   if (t.dataset.open) return openLead(t.dataset.open);
   const l = S.detail;
   if (t.dataset.outcome && l) {
@@ -792,6 +958,17 @@ document.addEventListener('click', e => {
     case 'signout': return signOut();
     case 'close': S.selected = null; S.detail = null; S.step = null; return render();
     case 'add': return openAddDialog();
+    case 'editdetails': S.editing = !S.editing; return render();
+    case 'savedetails': {
+      const form = $('#editform'); if (!form || !l) return;
+      const details = {}; form.querySelectorAll('input[name]').forEach(i => { details[i.name] = i.value; });
+      return run(() => api('editDetails', { id: l.id, details }), 'Details saved');
+    }
+    case 'reassign': {
+      const to = ($('#reassign') || {}).value; if (!to || !l) return;
+      const who = $('#reassign').selectedOptions[0].textContent;
+      return run(() => api('reassign', { id: l.id, to }), 'Reassigned to ' + who);
+    }
     case 'note': {
       const v = ($('#note') || {}).value || '';
       if (!v.trim()) return toast('Write a note first.', true);
@@ -801,9 +978,18 @@ document.addEventListener('click', e => {
   }
 });
 document.addEventListener('change', e => {
-  if (e.target.id === 'locsel') { S.location = e.target.value; S.selected = null; S.detail = null; S.filter = 'queue'; loadList(); }
+  if (e.target.id === 'locsel') { S.location = e.target.value; S.selected = null; S.detail = null; S.filter = 'queue'; S.q = ''; S.results = null; S.view = 'leads'; loadList(); }
 });
 document.addEventListener('input', e => {
+  if (e.target.id === 'q') {
+    S.q = e.target.value; S.searchMsg = '';
+    clearTimeout(doSearch.t);
+    if (!S.q.trim()) { S.results = null; if (S.view !== 'leads') S.view = 'leads'; return render(); }
+    if (S.view !== 'leads') S.view = 'leads';
+    S.results = null; render();
+    doSearch.t = setTimeout(doSearch, 300);
+    return;
+  }
   if (e.target.id === 'appt') { const w = $('#apptwarn'); if (w) w.innerHTML = warnHtml(doctorWarning(S.location, e.target.value)); }
 });
 
@@ -832,11 +1018,14 @@ async function start() {
       const res = await fetch('/api/config', { cache: 'no-store' });
       if (res.ok) {
         const cfg = await res.json();
-        if (cfg.googleClientId) { CONFIG.GOOGLE_CLIENT_ID = cfg.googleClientId; CONFIG.IDLE_MINUTES = cfg.idleMinutes || 30; DEMO = false; }
+        if (cfg.googleClientId) { CONFIG.GOOGLE_CLIENT_ID = cfg.googleClientId; CONFIG.IDLE_MINUTES = cfg.idleMinutes || 30; DEMO = false; CONFIG.SESSION_READY = cfg.sessionReady !== false; }
       }
     } catch (e) { /* no server: demo mode */ }
   }
   if (!DEMO && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+  if (!DEMO && CONFIG.SESSION_READY === false) return renderGate('Sign-in is not finished being set up on the server (SESSION_SECRET is missing). Tell your manager.');
+  // A valid session cookie from earlier today signs the person straight back in.
+  if (!DEMO) return boot();
   renderGate();
 }
 start();

@@ -70,14 +70,14 @@ npm install
 cp .env.example .env
 ```
 
-Fill in `.env`: SHEET_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY (the `private_key` value from the JSON file, in double quotes, keeping the `\n`), GOOGLE_CLIENT_ID, and a long random CRON_SECRET.
+Fill in `.env`: SHEET_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY (the `private_key` value from the JSON file, in double quotes, keeping the `\n`), GOOGLE_CLIENT_ID, and a long random CRON_SECRET. The app tolerates a badly pasted key (surrounding quotes, literal `\n`, Windows line breaks), but paste it cleanly anyway.
 
 ```
 npm test        # 39 checks, no Google needed
 npm run setup   # adds columns and tabs to the real sheet
 ```
 
-Setup prints what it did. It also warns if any columns hold data without a header, and places the CRM columns after them so nothing is overwritten. Check the sheet: 27 new columns at the right of all three lead tabs, and three new tabs, **CRM Activity**, **CRM Staff** and **CRM Settings**. It also sets the sheet's time zone to Toronto if it wasn't already. Running it again is safe.
+Setup prints what it did. It also warns if any columns hold data without a header, and places the CRM columns after them so nothing is overwritten. Check the sheet: 32 new columns at the right of all three lead tabs (an existing sheet that already has the first 27 just gets the 5 new ones: Assigned at and four Edited columns), and three new tabs, **CRM Activity**, **CRM Staff** and **CRM Settings**. It also sets the sheet's time zone to Toronto if it wasn't already. Running it again is safe.
 
 Open **CRM Settings** and check the opening hours and **CLOSED_DATES** for both sites.
 
@@ -105,6 +105,8 @@ The main website is untouched.
 ### 7. Add staff
 
 In **CRM Staff**, one row per person: Google email, first name, location (**Georgetown**, **Hanover**, or **Both** for managers and you), role, Active **TRUE**.
+
+Roles: **Staff** works leads at their site. **Lead** can also reassign a lead to another active person at that site. **Admin** can do all of that plus assign website leads that arrived with no location, and open the owner's report.
 
 Any Google account works. Someone without one can create a free account with their work email at accounts.google.com/signup. Set Active to **FALSE** to remove access; it takes effect within a minute.
 
@@ -146,6 +148,26 @@ Then add your test email to **EXCLUDE_EMAILS** in CRM Settings.
 Open crm.vanguardclinics.ca, then **Share > Add to Home Screen** (iPhone) or **menu > Install app** (Android). It opens full screen with the Vanguard icon. Nothing about leads is stored on the phone.
 
 ---
+
+## Sessions
+
+Staff sign in with Google once. The server then issues its own session cookie (`__Host-vg_session`: HttpOnly, Secure, SameSite=Strict) that lasts the working day. Defaults, all optional environment variables:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `SESSION_HOURS` | 12 | Hard limit. After this the person signs in again, however active they are. |
+| `IDLE_MINUTES` | 30 | Signs out after this long without a click or keystroke. Checked on the server as well as in the browser. The automatic 60-second refresh does not count as activity. |
+| `SESSION_SECRET` | falls back to `CRON_SECRET` | Signs the cookie. Set your own long random value in Vercel if you can; changing it signs everyone out. |
+
+The cookie holds only an email and timestamps, never lead data or a role. **CRM Staff is re-read on every request** (cached up to 30 seconds), so setting Active to FALSE locks that person out within about a minute, not when their session ends.
+
+## Features for leads and owners
+
+- **Search** (top bar): name, phone or email, across every stage, in the signed-in person's location only. Phone search ignores spaces, dashes, brackets and a leading +1. Untouched old leads hidden by SHOW_LEADS_FROM are still found.
+- **Unassigned** (Admin): Website Leads rows whose Location is blank or not Georgetown/Hanover. Assigning writes the Location column, logs it in CRM Activity, and starts the call 1 clock from that moment (the **Assigned at** column), not from the original timestamp.
+- **Reassign** (Lead and Admin): in an open lead, hand it to another active person who works that location. Sets Owner and logs old and new.
+- **Report** (Admin): weekly (Monday to Sunday, Toronto time), per location: leads, median time to first call, call 1 on time, contact rate, Marketing only rate, booked rate, no-show and registered rates, lost reasons, and lead quality by campaign. Leads count in the week they arrived or were assigned. No-show and registered rates are out of leads that were booked. A lead that was a no-show and then rebooked counts as booked, not no-show, because only the current stage is kept.
+- **Edit details** (everyone): correct a lead's name, phone or email. The intake columns are never changed. The correction is saved in the **Edited first name / last name / phone / email** columns, the CRM shows it everywhere, and the old and new values go to CRM Activity. Putting the original value back clears the correction.
 
 ## Good to know
 

@@ -44,9 +44,24 @@ export const FIELD_HEADERS = {
   mkt1At: 'Marketing email 1 sent at',
   mkt2At: 'Marketing email 2 sent at',
   updatedAt: 'Updated at',
-  updatedBy: 'Updated by'
+  updatedBy: 'Updated by',
+  assignedAt: 'Assigned at',
+  editedFirstName: 'Edited first name',
+  editedLastName: 'Edited last name',
+  editedPhone: 'Edited phone',
+  editedEmail: 'Edited email'
 };
 export const CRM_COLUMNS = Object.values(FIELD_HEADERS);
+
+// Columns the website intake owns. The CRM writes only Location, and only when
+// an Admin assigns a lead that arrived without one.
+export const INTAKE_HEADERS = { location: 'Location' };
+
+// Edited details live beside the intake columns, which are never overwritten.
+// A cell holding this marker means "the person asked for this to be blank".
+export const CLEARED = '(cleared)';
+
+export const ROLES = ['Staff', 'Lead', 'Admin'];
 
 // Opening hours from the Vanguard website, October 2026. Index 0 = Sunday.
 export const HOURS_SEED = {

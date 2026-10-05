@@ -83,10 +83,18 @@ export function call3Due(settings, loc, call2At) {
   return o ? closeOf(settings, loc, o) : null;
 }
 
+// When the call 1 clock starts: arrival, or the moment an Admin assigned a lead
+// that arrived without a location (whichever is later).
+export function leadStart(lead) {
+  if (lead.assignedAt && (!lead.created || lead.assignedAt > lead.created)) return lead.assignedAt;
+  return lead.created || null;
+}
+
 export function computeDue(settings, lead) {
   const done = lead.calls.filter(c => c.outcome).length;
   if (lead.stage === 'New' || (lead.stage === 'Calling' && done === 0)) {
-    return lead.created ? call1Due(settings, lead.location, lead.created) : null;
+    const start = leadStart(lead);
+    return start ? call1Due(settings, lead.location, start) : null;
   }
   if (lead.stage === 'Calling') {
     if (done === 1 && lead.calls[0].at) return call2Due(settings, lead.location, lead.calls[0].at);
