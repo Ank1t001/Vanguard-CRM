@@ -194,8 +194,8 @@ button:disabled{cursor:not-allowed; opacity:.5}
 .outcomes,.steps{display:flex; gap:var(--s2); flex-wrap:wrap}
 .outcome,.step{min-height:var(--tap); border:1px solid var(--line-2); background:var(--panel); border-radius:var(--r-sm); padding:0 var(--s4); font-weight:600; font-size:var(--fs-sm)}
 .outcome:hover,.step:hover{border-color:var(--primary)}
-.outcome.good{border-color:var(--ok); color:var(--ok); background:var(--ok-soft)}
-.outcome.bad{color:var(--red)}
+.block.focus{padding:var(--s4); border:1px solid var(--primary-line); background:var(--primary-soft); border-radius:var(--r)}
+.block.focus .step{background:var(--panel)}
 .step[aria-pressed="true"]{border-color:var(--primary); background:var(--primary-soft); color:var(--primary)}
 .calllog,.log{list-style:none; margin:0; padding:0; display:grid; gap:var(--s2); font-size:var(--fs-sm); color:var(--ink-2)}
 .calllog b{color:var(--ink)}
@@ -287,7 +287,6 @@ dialog.dlg::backdrop{background:rgba(14,25,37,.5)}
   .dial{width:100%}
   .outcomes{display:grid; grid-template-columns:1fr 1fr}
   .outcome{min-height:52px}
-  .outcome.good{grid-column:1 / -1}
   .steps{display:grid; grid-template-columns:1fr 1fr}
   .form .two,.dlg .two{grid-template-columns:1fr}
   .page{padding:var(--s4)}
@@ -872,6 +871,8 @@ function panelHtml() {
   const n = nextCall(l);
   const callable = ['New', 'Calling'].includes(l.stage) && n <= 3;
   const steps = NEXT_STEPS[l.stage] || [];
+  // Straight after "Spoke to them", the next step moves to the top of the lead.
+  const justSpoke = S.justSpoke === l.id && l.stage === 'Contacted' && steps.length > 0;
   const facts = [
     ['Reason', l.reason], ['Source', l.source + (l.channel ? ', ' + l.channel : '')],
     ['Received', fmtWhen(l.created)], ['First opened', l.firstOpenedAt ? fmtWhen(l.firstOpenedAt) + ' by ' + l.firstOpenedBy : 'Not yet'],
@@ -891,6 +892,7 @@ function panelHtml() {
     '<div class="p-body">' +
       '<div class="contact">' + (l.phone ? '<a class="dial" href="tel:' + esc(l.phone) + '" data-act="dial">' + PHONE_ICON + 'Call ' + esc(phonePretty(l.phone)) + '</a>' : '') +
         (l.email ? '<a class="mail" href="mailto:' + esc(l.email) + '">' + esc(l.email) + '</a>' : '') + '</div>' +
+      (justSpoke ? nextStepBlock(l, steps, true) : '') +
       '<div><button class="btn small" data-act="editdetails" aria-expanded="' + S.editing + '">' + (S.editing ? 'Cancel editing' : 'Fix name, phone or email') + '</button></div>' +
       (S.editing ? editForm(l) : '') +
       (l.detailsEdited && l.original && !S.editing ? '<p class="hint">Corrected in the CRM. Intake recorded: ' +
@@ -898,22 +900,16 @@ function panelHtml() {
       '<dl class="facts">' + facts.map(f => '<div><dt>' + esc(f[0]) + '</dt><dd>' + esc(f[1]) + '</dd></div>').join('') + '</dl>' +
 
       (callable ? '<div class="block"><h3>Call ' + n + ' of 3</h3><p class="hint">' + (l.nextDue ? dueChip(l) + ' ' : '') +
-        'How did it go?</p><div class="outcomes">' +
-        '<button class="outcome good" data-outcome="Spoke to them">Spoke to them</button>' +
-        '<button class="outcome" data-outcome="No answer">No answer</button>' +
-        '<button class="outcome" data-outcome="Voicemail left">Voicemail left</button>' +
-        '<button class="outcome" data-outcome="Busy, call back">Busy, call back</button>' +
-        '<button class="outcome bad" data-outcome="Wrong number">Wrong number</button></div>' +
+        'Tap what happened on this call. Nothing is saved until you tap.</p><div class="outcomes">' +
+        ['No answer', 'Voicemail left', 'Busy, call back', 'Spoke to them', 'Wrong number'].map(o =>
+          '<button class="outcome" data-outcome="' + o + '">' + o + '</button>').join('') + '</div>' +
         (n === 3 ? '<p class="hint">If call 3 goes unanswered, the lead moves to Marketing only and gets the "we tried to reach you" email.</p>' : '') +
       '</div>' : '') +
 
       (l.calls.some(c => c.at) ? '<div class="block"><h3>Calls</h3><ul class="calllog">' + l.calls.filter(c => c.at).map(c =>
         '<li><b>Call ' + c.n + '</b> ' + (c.outcome ? esc(c.outcome) : 'dialled, outcome not logged') + ', ' + fmtWhen(c.at) + (c.by ? ' by ' + esc(c.by) : '') + '</li>').join('') + '</ul></div>' : '') +
 
-      (steps.length ? '<div class="block"><h3>Next step</h3><div class="steps">' + steps.map(s =>
-        '<button class="step" data-step="' + esc(s) + '" aria-pressed="' + (S.step === s) + '">' + esc(STEP_LABEL[s](l.stage)) + '</button>').join('') +
-        (l.stage === 'Booked' ? '<button class="step" data-step="reschedule" aria-pressed="' + (S.step === 'reschedule') + '">Move intake</button>' : '') +
-        '</div>' + stepForm(l) + '</div>' : '') +
+      (steps.length && !justSpoke ? nextStepBlock(l, steps, false) : '') +
 
       (!['New', 'Calling'].includes(l.stage) ? '<div class="block"><h3>Lead quality</h3><p class="hint">Your read on this person after speaking to them.</p><div class="seg-ctl" role="group" aria-label="Lead quality">' +
         ['Good', 'OK', 'Poor'].map(q => '<button data-quality="' + q + '" aria-pressed="' + (l.quality === q) + '">' + q + '</button>').join('') + '</div></div>' : '') +
@@ -928,6 +924,14 @@ function panelHtml() {
       (S.activity.length ? '<div class="block"><h3>Activity</h3><ul class="log">' + S.activity.slice(0, 20).map(a =>
         '<li><time>' + fmtWhen(a.at) + '</time>' + esc(a.staff) + ': ' + esc(a.action) + (a.to ? ' (' + esc(a.from ? a.from + ' to ' + a.to : a.to) + ')' : '') + (a.detail ? ', ' + esc(a.detail) : '') + '</li>').join('') + '</ul></div>' : '') +
     '</div></aside>';
+}
+function nextStepBlock(l, steps, focus) {
+  return '<div class="block' + (focus ? ' focus' : '') + '"><h3>' + (focus ? 'You spoke to them. What happens next?' : 'Next step') + '</h3>' +
+    (focus ? '<p class="hint">Book the intake now while they are on the phone, or set a follow-up date.</p>' : '') +
+    '<div class="steps">' + steps.map(s =>
+      '<button class="step" data-step="' + esc(s) + '" aria-pressed="' + (S.step === s) + '">' + esc(STEP_LABEL[s](l.stage)) + '</button>').join('') +
+    (l.stage === 'Booked' ? '<button class="step" data-step="reschedule" aria-pressed="' + (S.step === 'reschedule') + '">Move intake</button>' : '') +
+    '</div>' + stepForm(l) + '</div>';
 }
 function editForm(l) {
   return '<div class="form" id="editform"><div class="two"><label>First name<input name="firstName" value="' + esc(l.firstName) + '" autocomplete="off"></label>' +
@@ -973,7 +977,7 @@ const warnHtml = w => w ? '<div class="warn">' + esc(w) + '</div>' : '';
 
 /* ---------------- Actions ---------------- */
 async function openLead(id) {
-  S.selected = id; S.step = null; S.editing = false;
+  S.selected = id; S.step = null; S.editing = false; S.justSpoke = null;
   S.detail = S.leads.find(l => l.id === id) || (S.results || []).find(l => l.id === id) || null; S.activity = []; S.team = [];
   render();
   try {
@@ -1025,7 +1029,9 @@ document.addEventListener('click', e => {
   if (t.dataset.outcome && l) {
     const n = nextCall(l), o = t.dataset.outcome;
     const msg = o === 'Spoke to them' ? 'Moved to Contacted' : o === 'Wrong number' ? 'Closed as wrong number' : n === 3 ? 'No answer to 3 calls. Moved to Marketing only' : 'Call ' + n + ' logged. Call ' + (n + 1) + ' is now due';
-    return run(() => api('logCall', { id: l.id, call: n, outcome: o }), msg);
+    return run(() => api('logCall', { id: l.id, call: n, outcome: o }), msg).then(() => {
+      if (o === 'Spoke to them' && S.detail && S.detail.stage === 'Contacted') { S.justSpoke = S.detail.id; render(); }
+    });
   }
   if (t.dataset.step) { S.step = S.step === t.dataset.step ? null : t.dataset.step; render(); return; }
   if (t.dataset.confirm && l) {
