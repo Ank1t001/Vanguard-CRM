@@ -1,5 +1,7 @@
 # Vanguard lead desk
 
+_Designed and built by **Help Me Marketing (HMM)** for Vanguard Pharmacy & Clinic._
+
 The CRM the Georgetown and Hanover pharmacy teams use to call, track and book new patient leads. Hosted on Vercel at **crm.vanguardclinics.ca**. The "Vanguard - All Leads" Google Sheet is the database; staff never get access to it.
 
 ```

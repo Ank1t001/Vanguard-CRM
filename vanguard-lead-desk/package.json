@@ -4,12 +4,15 @@
   "private": true,
   "type": "module",
   "description": "Vanguard lead desk: CRM for the Georgetown and Hanover pharmacy teams. Google Sheet as the database for now.",
-  "engines": { "node": ">=20.6" },
+  "engines": {
+    "node": ">=20.6"
+  },
   "scripts": {
     "setup": "node --env-file=.env scripts/setup.mjs",
     "test": "node scripts/test.mjs"
   },
   "dependencies": {
     "google-auth-library": "^9.15.0"
-  }
+  },
+  "author": "Help Me Marketing (HMM)"
 }
