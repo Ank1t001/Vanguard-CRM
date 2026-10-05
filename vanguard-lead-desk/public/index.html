@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Vanguard lead desk</title>
+<meta name="theme-color" content="#1B2B4B">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Lead desk">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F3F5F9; --panel:#FFFFFF; --ink:#1B2B4B; --ink-2:#4B5A78; --ink-3:#7A8699;
+  --line:#DCE2EC; --line-2:#C9D2E0; --navy:#2E5596; --navy-soft:#E6EDF8;
+  --olive:#5F7F1F; --olive-soft:#EEF3E2; --amber:#9A6206; --amber-soft:#FBF1DD;
+  --red:#B42318; --red-soft:#FCE8E6; --focus:#2E5596;
+  --sans:"Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --serif:"Source Serif 4", Georgia, "Times New Roman", serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111827; --panel:#182235; --ink:#E7ECF5; --ink-2:#B3BDD0; --ink-3:#8590A6;
+    --line:#2A3650; --line-2:#3A4866; --navy:#8FB0E8; --navy-soft:#1F2E4D;
+    --olive:#A8C46A; --olive-soft:#24301A; --amber:#E7B661; --amber-soft:#33280F;
+    --red:#F08A80; --red-soft:#3A1C1A; --focus:#8FB0E8;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111827; --panel:#182235; --ink:#E7ECF5; --ink-2:#B3BDD0; --ink-3:#8590A6;
+  --line:#2A3650; --line-2:#3A4866; --navy:#8FB0E8; --navy-soft:#1F2E4D;
+  --olive:#A8C46A; --olive-soft:#24301A; --amber:#E7B661; --amber-soft:#33280F;
+  --red:#F08A80; --red-soft:#3A1C1A; --focus:#8FB0E8;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%; scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:16px/1.45 var(--sans); -webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit; color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--focus); outline-offset:2px; border-radius:6px}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+
+/* Sign in */
+.gate{min-height:100vh; display:grid; place-items:center; padding:24px}
+.gate-card{width:min(420px,100%); background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:32px}
+.gate h1{font:600 30px/1.15 var(--serif); margin:0 0 8px}
+.gate p{color:var(--ink-2); margin:0 0 20px}
+.gate .demo-row{display:flex; gap:10px; flex-wrap:wrap}
+.gate .err{color:var(--red); margin-top:14px}
+
+/* Top bar */
+.bar{display:flex; align-items:center; gap:16px; padding:14px 24px; background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:env(safe-area-inset-top,0px); z-index:5}
+.brand{font:600 20px/1 var(--serif); white-space:nowrap}
+.loc{font-weight:600; color:var(--navy)}
+.loc select{border:1px solid var(--line-2); border-radius:8px; padding:4px 8px; background:var(--panel); color:var(--navy); font-weight:600}
+.bar .spacer{flex:1}
+.who{color:var(--ink-2); font-size:14px; white-space:nowrap}
+.btn{border:1px solid var(--line-2); background:var(--panel); border-radius:8px; padding:8px 14px; font-weight:600}
+.btn:hover{border-color:var(--navy)}
+.btn.primary{background:var(--navy); border-color:var(--navy); color:#fff}
+:root[data-theme="dark"] .btn.primary{color:#0E1626}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.primary{color:#0E1626}}
+.btn.ghost{border-color:transparent; background:transparent; color:var(--ink-2)}
+.btn.small{padding:5px 10px; font-size:14px}
+.demo-flag{font-size:13px; color:var(--amber); background:var(--amber-soft); border-radius:999px; padding:3px 10px; white-space:nowrap}
+
+/* Funnel rail: the spine of the page */
+.rail{padding:18px 24px 6px; display:grid; gap:10px}
+.path{display:grid; grid-template-columns:1.05fr repeat(5,1fr); gap:0}
+.seg{position:relative; text-align:left; border:0; background:var(--panel); padding:12px 26px 12px 20px; min-height:96px;
+  clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%, 14px 50%);
+  margin-left:-8px; border-top:1px solid var(--line); border-bottom:1px solid var(--line)}
+.seg:first-child{clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%); margin-left:0; border-radius:10px 0 0 10px; border-left:1px solid var(--line)}
+.seg .n{font:600 28px/1 var(--serif)}
+.seg .t{font-weight:700; margin-top:4px}
+.seg .r{font-size:13px; color:var(--ink-2); line-height:1.3; margin-top:2px; max-width:22ch}
+.seg:hover{background:var(--navy-soft)}
+.seg[aria-pressed="true"]{background:var(--navy); color:#fff}
+.seg[aria-pressed="true"] .r{color:rgba(255,255,255,.82)}
+:root[data-theme="dark"] .seg[aria-pressed="true"]{color:#0E1626}
+:root[data-theme="dark"] .seg[aria-pressed="true"] .r{color:#24324F}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .seg[aria-pressed="true"]{color:#0E1626}
+  :root:not([data-theme="light"]) .seg[aria-pressed="true"] .r{color:#24324F}
+}
+.seg.callnow .n{color:var(--red)}
+.seg.callnow[aria-pressed="true"] .n{color:inherit}
+.side{display:flex; gap:8px; flex-wrap:wrap}
+.pill{display:flex; align-items:baseline; gap:8px; border:1px solid var(--line); background:var(--panel); border-radius:999px; padding:6px 14px; text-align:left}
+.pill .n{font:600 17px/1 var(--serif)}
+.pill .t{font-weight:600}
+.pill .r{font-size:13px; color:var(--ink-2)}
+.pill:hover{border-color:var(--navy)}
+.pill[aria-pressed="true"]{border-color:var(--navy); background:var(--navy-soft)}
+
+/* Work area */
+.work{display:grid; grid-template-columns:minmax(340px,440px) 1fr; gap:18px; padding:12px 24px 28px; align-items:start}
+.list,.panel{background:var(--panel); border:1px solid var(--line); border-radius:12px}
+.list-head{padding:16px 18px 12px; border-bottom:1px solid var(--line)}
+.list-head h2{font:600 20px/1.2 var(--serif); margin:0}
+.list-head p{margin:4px 0 0; color:var(--ink-2); font-size:14px}
+.stats{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
+.stat{font-size:13px; border-radius:6px; padding:3px 8px; background:var(--bg); color:var(--ink-2)}
+.stat b{color:var(--ink)}
+.stat.bad b{color:var(--red)}
+.rows{list-style:none; margin:0; padding:0; max-height:calc(100vh - 340px); overflow:auto}
+.row{display:block; width:100%; text-align:left; border:0; border-bottom:1px solid var(--line); background:transparent; padding:12px 18px}
+.row:hover{background:var(--bg)}
+.row[aria-current="true"]{background:var(--navy-soft); box-shadow:inset 3px 0 0 var(--navy)}
+.row .top{display:flex; justify-content:space-between; gap:10px; align-items:baseline}
+.row .name{font-weight:700}
+.row .meta{font-size:14px; color:var(--ink-2); margin-top:2px}
+.row .tags{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px}
+.tag{font-size:12.5px; border-radius:6px; padding:2px 7px; background:var(--bg); color:var(--ink-2); border:1px solid var(--line)}
+.tag.ok{background:var(--olive-soft); color:var(--olive); border-color:transparent}
+.tag.again{background:var(--amber-soft); color:var(--amber); border-color:transparent}
+.due{font-size:13px; font-weight:600; border-radius:6px; padding:2px 8px; white-space:nowrap; background:var(--bg); color:var(--ink-2)}
+.due.soon{background:var(--amber-soft); color:var(--amber)}
+.due.late{background:var(--red-soft); color:var(--red)}
+.empty{padding:32px 18px; color:var(--ink-2)}
+
+.panel{min-height:420px}
+.panel .blank{padding:48px 28px; color:var(--ink-2)}
+.panel .blank h3{font:600 20px/1.2 var(--serif); color:var(--ink); margin:0 0 6px}
+.p-head{display:flex; gap:12px; align-items:flex-start; padding:20px 24px 14px; border-bottom:1px solid var(--line)}
+.p-head h2{font:600 26px/1.15 var(--serif); margin:0}
+.p-head .stage{display:inline-block; margin-top:6px; font-size:13px; font-weight:600; border-radius:999px; padding:2px 10px; background:var(--navy-soft); color:var(--navy)}
+.p-head .close{margin-left:auto}
+.p-body{padding:18px 24px 28px; display:grid; gap:22px}
+.dial{display:inline-flex; align-items:center; gap:10px; background:var(--navy); color:#fff; text-decoration:none; font-weight:700; font-size:18px; border-radius:10px; padding:12px 18px}
+:root[data-theme="dark"] .dial{color:#0E1626}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .dial{color:#0E1626}}
+.contact{display:flex; gap:14px; align-items:center; flex-wrap:wrap}
+.contact a.mail{color:var(--navy)}
+.facts{display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:12px 20px; margin:0}
+.facts dt{font-size:13px; color:var(--ink-3)}
+.facts dd{margin:2px 0 0; font-weight:600}
+.block h3{font:600 17px/1.2 var(--serif); margin:0 0 4px}
+.block .hint{color:var(--ink-2); font-size:14px; margin:0 0 10px}
+.outcomes{display:flex; gap:8px; flex-wrap:wrap}
+.outcome{border:1px solid var(--line-2); background:var(--panel); border-radius:8px; padding:9px 14px; font-weight:600}
+.outcome:hover{border-color:var(--navy)}
+.outcome.good{border-color:var(--olive); color:var(--olive)}
+.outcome.bad{color:var(--red)}
+.calllog{list-style:none; margin:10px 0 0; padding:0; display:grid; gap:6px}
+.calllog li{font-size:14px; color:var(--ink-2)}
+.calllog b{color:var(--ink)}
+.steps{display:flex; gap:8px; flex-wrap:wrap}
+.step{border:1px solid var(--line-2); background:var(--panel); border-radius:8px; padding:8px 14px; font-weight:600}
+.step[aria-pressed="true"]{border-color:var(--navy); background:var(--navy-soft); color:var(--navy)}
+.form{display:grid; gap:10px; margin-top:12px; padding:14px; border:1px solid var(--line); border-radius:10px; background:var(--bg)}
+.form label{display:grid; gap:4px; font-size:14px; font-weight:600}
+.form input,.form select,.form textarea,.dlg input,.dlg select{border:1px solid var(--line-2); border-radius:8px; padding:9px 10px; background:var(--panel)}
+.warn{font-size:14px; color:var(--amber); background:var(--amber-soft); border-radius:8px; padding:8px 10px}
+.seg-ctl{display:inline-flex; border:1px solid var(--line-2); border-radius:8px; overflow:hidden}
+.seg-ctl button{border:0; background:var(--panel); padding:7px 16px; font-weight:600; border-right:1px solid var(--line-2)}
+.seg-ctl button:last-child{border-right:0}
+.seg-ctl button[aria-pressed="true"]{background:var(--navy); color:#fff}
+textarea{width:100%; min-height:80px; resize:vertical}
+.notes{white-space:pre-wrap; font-size:14px; color:var(--ink-2); background:var(--bg); border-radius:8px; padding:10px 12px; margin-top:10px}
+.log{list-style:none; margin:0; padding:0; display:grid; gap:6px; font-size:14px; color:var(--ink-2)}
+.log time{color:var(--ink-3); margin-right:6px}
+
+dialog.dlg{border:1px solid var(--line); border-radius:14px; padding:0; width:min(480px,94vw); background:var(--panel); color:var(--ink)}
+dialog.dlg::backdrop{background:rgba(17,24,39,.45)}
+.dlg form{padding:22px 24px; display:grid; gap:12px}
+.dlg h2{font:600 22px/1.2 var(--serif); margin:0}
+.dlg label{display:grid; gap:4px; font-size:14px; font-weight:600}
+.dlg .two{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.dlg .actions{display:flex; justify-content:flex-end; gap:8px; margin-top:6px}
+
+.toast{position:sticky; bottom:calc(16px + env(safe-area-inset-bottom,0px)); margin:0 auto; width:max-content; max-width:92vw; background:var(--ink); color:var(--panel); padding:10px 16px; border-radius:10px; font-weight:600; z-index:20}
+.toast.err{background:var(--red); color:#fff}
+
+@media (max-width: 1100px){
+  .path{grid-template-columns:repeat(3,1fr); row-gap:6px}
+  .seg,.seg:first-child{clip-path:none; margin-left:0; border:1px solid var(--line); border-radius:10px; min-height:auto}
+  .path{gap:6px}
+}
+@media (max-width: 860px){
+  .bar{padding:12px 14px; flex-wrap:wrap}
+  .rail,.work{padding-left:14px; padding-right:14px}
+  .work{grid-template-columns:1fr}
+  .rows{max-height:none}
+  .panel.open{position:fixed; inset:0; z-index:30; border-radius:0; overflow:auto; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px)}
+  .panel:not(.open){display:none}
+  .path{grid-template-columns:repeat(2,1fr)}
+  .seg .r{display:none}
+  .pill .r{display:none}
+  .pill .t{white-space:nowrap}
+  .side{gap:6px}
+}
+@media (prefers-reduced-motion: no-preference){
+  .row,.seg,.pill,.btn,.outcome,.step{transition:background-color .12s, border-color .12s}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast-host" aria-live="polite"></div>
+
+<script>
+/* ------------------------------------------------------------------
+   Configuration comes from the server (/api/config), so nothing in this
+   file needs editing. Add ?demo to the URL, or open the file without a
+   server, and it runs as a demo with sample leads.
+------------------------------------------------------------------- */
+const CONFIG = { GOOGLE_CLIENT_ID: '', IDLE_MINUTES: 30, REFRESH_SECONDS: 60 };
+let DEMO = true;
+
+const MAIN_PATH = ['New', 'Calling', 'Contacted', 'Booked', 'Registered'];
+const SIDE = ['Follow-up later', 'No-show', 'Marketing only', 'Lost'];
+const RULES = {
+  queue: 'Every lead due for a call, most urgent first.',
+  'New': 'Welcome email sent. Call 1 within 30 minutes.',
+  'Calling': 'Call 2 within 3 hours. Call 3 next business day.',
+  'Contacted': 'Spoke to them. Add notes, set the next step.',
+  'Booked': 'Intake set. Reminder goes out the day before.',
+  'Registered': 'Rostered as a patient.',
+  'Follow-up later': 'Wants info first. Call on the date set.',
+  'No-show': 'Missed the intake. Reschedule email sent.',
+  'Marketing only': 'No answer to 3 calls. Two emails, then it stops.',
+  'Lost': 'Closed, with a reason.'
+};
+const NEXT_STEPS = {
+  'Contacted': ['Follow-up later', 'Booked', 'Lost'],
+  'Follow-up later': ['Contacted', 'Booked', 'Lost'],
+  'Booked': ['Registered', 'No-show', 'Lost'],
+  'No-show': ['Booked', 'Follow-up later', 'Lost'],
+  'Marketing only': ['Contacted', 'Lost'],
+  'Lost': ['Contacted'],
+  'Registered': []
+};
+const STEP_LABEL = {
+  'Contacted': s => s === 'Marketing only' ? 'They replied or called back' : (s === 'Lost' ? 'Reopen' : 'Spoke to them'),
+  'Follow-up later': () => 'Follow up later', 'Booked': () => 'Book intake', 'Registered': () => 'Mark registered',
+  'No-show': () => 'Mark no-show', 'Lost': () => 'Close lead'
+};
+const DAYNAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const S = {
+  token: null, me: null, location: null, leads: [], filter: 'queue', selected: null,
+  detail: null, activity: [], step: null, busy: false, error: ''
+};
+
+/* ---------------- Utilities ---------------- */
+const $ = sel => document.querySelector(sel);
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtTime = d => new Date(d).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+const fmtDay = d => {
+  const x = new Date(d), now = new Date();
+  const same = (a, b) => a.toDateString() === b.toDateString();
+  const tmw = new Date(now); tmw.setDate(now.getDate() + 1);
+  const yst = new Date(now); yst.setDate(now.getDate() - 1);
+  if (same(x, now)) return 'today';
+  if (same(x, tmw)) return 'tomorrow';
+  if (same(x, yst)) return 'yesterday';
+  return x.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
+};
+const fmtWhen = d => d ? fmtDay(d) + ' ' + fmtTime(d) : '';
+const ago = d => {
+  const m = Math.round((Date.now() - new Date(d)) / 6e4);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + ' min ago';
+  const h = Math.round(m / 60);
+  if (h < 24) return h + ' h ago';
+  return fmtDay(d);
+};
+const phonePretty = p => {
+  const d = String(p || '').replace(/\D/g, '');
+  const t = d.length === 11 && d[0] === '1' ? d.slice(1) : d;
+  return t.length === 10 ? '(' + t.slice(0, 3) + ') ' + t.slice(3, 6) + '-' + t.slice(6) : (p || '');
+};
+const fullName = l => (l.firstName + ' ' + (l.lastName || '')).trim() || 'No name';
+const doneCalls = l => l.calls.filter(c => c.outcome).length;
+const nextCall = l => doneCalls(l) + 1;
+function toast(msg, isErr) {
+  const host = $('#toast-host');
+  host.innerHTML = '<div class="toast' + (isErr ? ' err' : '') + '">' + esc(msg) + '</div>';
+  clearTimeout(toast.t); toast.t = setTimeout(() => { host.innerHTML = ''; }, 3500);
+}
+function localInputValue(d) {
+  const x = new Date(d); const p = n => String(n).padStart(2, '0');
+  return x.getFullYear() + '-' + p(x.getMonth() + 1) + '-' + p(x.getDate()) + 'T' + p(x.getHours()) + ':' + p(x.getMinutes());
+}
+
+/* ---------------- Opening hours (shared by demo and booking warnings) ---------------- */
+const HOURS_SEED = {
+  Georgetown: {
+    pharmacy: ['Closed', '09:00-18:00', '09:00-18:00', '09:00-18:00', '09:00-18:00', '09:00-18:00', '10:00-15:00'],
+    doctor: ['Closed', '09:00-17:00', 'Closed', '09:00-17:00', '09:00-17:00', 'Closed', '10:00-15:00']
+  },
+  Hanover: {
+    pharmacy: ['10:00-15:00', '09:00-18:00', '09:00-18:00', '09:00-18:00', '09:00-18:00', '09:00-18:00', '10:00-15:00'],
+    doctor: ['Closed', '09:00-18:00', '09:00-18:00', 'Closed', '09:00-18:00', '09:00-15:00', 'Closed']
+  }
+};
+const CLOSED_SEED = ['2026-10-12', '2026-12-25', '2026-12-26', '2027-01-01'];
+const hoursMap = () => (S.me && S.me.hours) || HOURS_SEED;
+const closedList = () => (S.me && S.me.closedDates) || CLOSED_SEED;
+const ymd = d => { const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
+function hoursFor(loc, kind, d) {
+  if (closedList().includes(ymd(d))) return null;
+  const raw = hoursMap()[loc][kind][d.getDay()];
+  const m = /^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$/.exec(String(raw).trim());
+  return m ? { open: +m[1] * 60 + +m[2], close: +m[3] * 60 + +m[4] } : null;
+}
+const at = (d, mins) => { const x = new Date(d); x.setHours(Math.floor(mins / 60), mins % 60, 0, 0); return x; };
+const addMin = (d, m) => new Date(new Date(d).getTime() + m * 6e4);
+function nextOpen(loc, d) {
+  for (let i = 0; i < 9; i++) {
+    const day = new Date(d); day.setDate(day.getDate() + i);
+    const h = hoursFor(loc, 'pharmacy', day); if (!h) continue;
+    const o = at(day, h.open), c = at(day, h.close);
+    if (i === 0) { if (d < o) return o; if (d < c) return new Date(d); continue; }
+    return o;
+  }
+  return null;
+}
+function closeOf(loc, d) {
+  const h = hoursFor(loc, 'pharmacy', d); if (!h) return null;
+  const o = at(d, h.open), c = at(d, h.close);
+  return d >= o && d < c ? c : null;
+}
+function call1Due(loc, created) {
+  const c = new Date(created), o = nextOpen(loc, c);
+  if (+o === +c) { const cl = closeOf(loc, c); let due = addMin(c, 30); if (due > cl) due = (cl - c >= 6e5) ? cl : addMin(nextOpen(loc, cl), 30); return due; }
+  return addMin(o, 30);
+}
+function call2Due(loc, t) {
+  t = new Date(t); const due = addMin(t, 180), cl = closeOf(loc, t);
+  if (cl && due <= cl) return due;
+  return addMin(nextOpen(loc, cl || t), 60);
+}
+function call3Due(loc, t) {
+  const nd = new Date(t); nd.setDate(nd.getDate() + 1); nd.setHours(0, 0, 0, 0);
+  const o = nextOpen(loc, nd); return closeOf(loc, o);
+}
+function doctorWarning(loc, value) {
+  if (!value) return '';
+  const d = new Date(value); if (isNaN(d)) return '';
+  if (closedList().includes(ymd(d))) return 'Both sites are closed on that date.';
+  const h = hoursFor(loc, 'doctor', d);
+  if (!h) return 'No doctor on site at ' + loc + ' on ' + DAYNAMES[d.getDay()] + 's. Pick another day.';
+  const mins = d.getHours() * 60 + d.getMinutes();
+  if (mins < h.open || mins >= h.close) return 'The doctor is on site from ' + fmtTime(at(d, h.open)) + ' to ' + fmtTime(at(d, h.close)) + ' that day.';
+  return '';
+}
+
+/* ---------------- API ---------------- */
+async function api(action, payload) {
+  if (DEMO) return demoApi(action, payload || {});
+  let out;
+  try {
+    const res = await fetch('/api/crm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({ action, token: S.token, location: S.location }, payload || {}))
+    });
+    out = await res.json();
+  } catch (e) {
+    throw new Error('Could not reach the server. Check your connection and try again.');
+  }
+  if (!out.ok) {
+    if (out.error === 'signin' || out.error === 'not-approved') { signOut(out.message); throw new Error(out.message); }
+    throw new Error(out.message || 'Request failed.');
+  }
+  return out.data;
+}
+
+/* ---------------- Demo data and demo server ---------------- */
+let DB = null;
+function demoSeed() {
+  const now = Date.now(), M = 6e4, H = 36e5, D = 864e5;
+  const mk = (loc, id, first, last, phone, reason, source, createdMs, extra) => Object.assign({
+    id, location: loc, firstName: first, lastName: last, phone, email: first.toLowerCase() + '.' + last.toLowerCase() + '@example.com',
+    reason, source, channel: '', created: new Date(createdMs).toISOString(), stage: 'New', lostReason: '', quality: '', owner: '',
+    firstOpenedAt: null, firstOpenedBy: '', calls: [1, 2, 3].map(n => ({ n, at: null, outcome: '', by: '' })),
+    contactedAt: null, followUp: null, appointment: null, notes: '', welcomeAt: new Date(createdMs + M).toISOString(),
+    mkt1At: null, mkt2At: null, submissions: 1, updatedAt: null, updatedBy: ''
+  }, extra || {});
+  const call = (l, n, msAgo, outcome, by) => { l.calls[n - 1] = { n, at: new Date(now - msAgo).toISOString(), outcome, by }; return l; };
+  const L = [];
+  // Georgetown
+  L.push(mk('Georgetown', 'GT-D01', 'Maya', 'Thompson', '+12895550134', 'Register as a new patient', 'Meta instant form', now - 12 * M));
+  L.push(mk('Georgetown', 'GT-D02', 'Arjun', 'Mehta', '+14165550188', 'Register as a new patient', 'Google Search', now - 2.2 * H, { submissions: 2 }));
+  L.push(mk('Georgetown', 'GT-D03', 'Claire', 'Dubois', '+19055550172', 'Learn more before registering', 'Meta instant form', now - 16 * H));
+  L.push(call(mk('Georgetown', 'GT-D04', 'Daniel', 'Okafor', '+16475550119', 'Register as a new patient', 'Georgetown landing page', now - 5 * H, { stage: 'Calling', firstOpenedAt: new Date(now - 4.6 * H).toISOString(), firstOpenedBy: 'Priya', owner: 'Priya' }), 1, 2.5 * H, 'No answer', 'Priya'));
+  const d5 = mk('Georgetown', 'GT-D05', 'Sofia', 'Rossi', '+12895550161', 'Register as a new patient', 'Meta instant form', now - 1.6 * D, { stage: 'Calling', firstOpenedAt: new Date(now - 1.55 * D).toISOString(), firstOpenedBy: 'Priya', owner: 'Priya' });
+  call(d5, 1, 1.5 * D, 'Voicemail left', 'Priya'); call(d5, 2, 1.3 * D, 'No answer', 'Jordan'); L.push(d5);
+  const d6 = mk('Georgetown', 'GT-D06', 'Liam', 'Chen', '+19055550147', 'Register as a new patient', 'Google Maps', now - 1.2 * D, { stage: 'Contacted', quality: 'Good', firstOpenedAt: new Date(now - 1.19 * D).toISOString(), firstOpenedBy: 'Jordan', owner: 'Jordan', contactedAt: new Date(now - 1.18 * D).toISOString(), notes: 'Jordan: Family of four moving from Brampton. Wants to register everyone. Asked about walk-in hours.' });
+  call(d6, 1, 1.18 * D, 'Spoke to them', 'Jordan'); L.push(d6);
+  const d7 = mk('Georgetown', 'GT-D07', 'Hannah', 'Novak', '+12895550190', 'Learn more before registering', 'Meta instant form', now - 2 * D, { stage: 'Follow-up later', owner: 'Priya', followUp: new Date(now + 1 * D).toISOString(), firstOpenedAt: new Date(now - 1.98 * D).toISOString(), firstOpenedBy: 'Priya', notes: 'Priya: Checking with her current clinic first. Call back tomorrow.' });
+  call(d7, 1, 1.97 * D, 'Spoke to them', 'Priya'); L.push(d7);
+  const d8 = mk('Georgetown', 'GT-D08', 'Marcus', 'Reid', '+16475550126', 'Register as a new patient', 'Google Search', now - 3 * D, { stage: 'Booked', quality: 'Good', owner: 'Jordan', appointment: at(new Date(now + 2 * D), 10 * 60).toISOString(), firstOpenedAt: new Date(now - 2.99 * D).toISOString(), firstOpenedBy: 'Jordan' });
+  call(d8, 1, 2.98 * D, 'Spoke to them', 'Jordan'); L.push(d8);
+  const d9 = mk('Georgetown', 'GT-D09', 'Elena', 'Petrova', '+19055550155', 'Register as a new patient', 'Meta instant form', now - 6 * D, { stage: 'No-show', owner: 'Priya', firstOpenedAt: new Date(now - 5.99 * D).toISOString(), firstOpenedBy: 'Priya' });
+  call(d9, 1, 5.98 * D, 'Spoke to them', 'Priya'); L.push(d9);
+  ['Tom Gallagher', 'Grace Kim'].forEach((n, i) => { const [f, l] = n.split(' '); const x = mk('Georgetown', 'GT-D1' + i, f, l, '+1289555020' + i, 'Register as a new patient', 'Meta instant form', now - (8 + i) * D, { stage: 'Registered', quality: 'Good', owner: 'Jordan', firstOpenedAt: new Date(now - (8 + i) * D + H).toISOString(), firstOpenedBy: 'Jordan' }); call(x, 1, (8 + i) * D - H, 'Spoke to them', 'Jordan'); L.push(x); });
+  const d12 = mk('Georgetown', 'GT-D12', 'Owen', 'Clarke', '+14165550111', 'Register as a new patient', 'Meta instant form', now - 5 * D, { stage: 'Marketing only', owner: 'Priya', mkt1At: new Date(now - 3 * D).toISOString(), firstOpenedAt: new Date(now - 4.99 * D).toISOString(), firstOpenedBy: 'Priya' });
+  call(d12, 1, 4.98 * D, 'No answer', 'Priya'); call(d12, 2, 4.9 * D, 'Voicemail left', 'Priya'); call(d12, 3, 3.1 * D, 'No answer', 'Jordan'); L.push(d12);
+  const d13 = mk('Georgetown', 'GT-D13', 'Noah', 'Bennett', '+16475550177', 'Register as a new patient', 'Google Search', now - 4 * D, { stage: 'Lost', lostReason: 'Found another doctor', quality: 'OK', owner: 'Jordan', firstOpenedAt: new Date(now - 3.99 * D).toISOString(), firstOpenedBy: 'Jordan' });
+  call(d13, 1, 3.98 * D, 'Spoke to them', 'Jordan'); L.push(d13);
+  // Hanover
+  L.push(mk('Hanover', 'HN-D01', 'Ruth', 'Becker', '+15195550142', 'New patient', 'Hanover landing page', now - 40 * M));
+  L.push(mk('Hanover', 'HN-D02', 'Kevin', 'Schmidt', '+15195550163', 'New patient', 'Website contact form', now - 20 * H));
+  const h3 = mk('Hanover', 'HN-D03', 'Linda', 'Moore', '+15195550184', 'New patient', 'Hanover landing page', now - 2 * D, { stage: 'Booked', owner: 'Sam', appointment: at(new Date(now + 3 * D), 11 * 60).toISOString(), firstOpenedAt: new Date(now - 1.99 * D).toISOString(), firstOpenedBy: 'Sam' });
+  call(h3, 1, 1.98 * D, 'Spoke to them', 'Sam'); L.push(h3);
+  const h4 = mk('Hanover', 'HN-D04', 'Jacob', 'Weber', '+15195550129', 'New patient', 'Hanover landing page', now - 7 * H, { stage: 'Calling', owner: 'Sam', firstOpenedAt: new Date(now - 6.8 * H).toISOString(), firstOpenedBy: 'Sam' });
+  call(h4, 1, 6.5 * H, 'Busy, call back', 'Sam'); L.push(h4);
+  DB = { leads: L, activity: {} };
+}
+function demoDue(l) {
+  const d = doneCalls(l);
+  if (l.stage === 'New') return call1Due(l.location, l.created);
+  if (l.stage === 'Calling' && d === 1) return call2Due(l.location, l.calls[0].at);
+  if (l.stage === 'Calling' && d === 2) return call3Due(l.location, l.calls[1].at);
+  if (l.stage === 'Follow-up later') return l.followUp ? new Date(l.followUp) : null;
+  return null;
+}
+function demoLog(l, action, from, to, detail) {
+  (DB.activity[l.id] = DB.activity[l.id] || []).unshift({ at: new Date().toISOString(), staff: S.me.name, action, from: from || '', to: to || '', detail: detail || '' });
+}
+function demoOut(l) { const c = JSON.parse(JSON.stringify(l)); const due = demoDue(l); c.nextDue = due ? due.toISOString() : null; return c; }
+async function demoApi(action, p) {
+  await new Promise(r => setTimeout(r, 120));
+  const loc = S.location;
+  const find = id => { const l = DB.leads.find(x => x.id === id && x.location === loc); if (!l) throw new Error('Lead not found.'); return l; };
+  const touch = l => { l.updatedAt = new Date().toISOString(); l.updatedBy = S.me.name; };
+  if (action === 'me') return S.me;
+  if (action === 'list') return { leads: DB.leads.filter(l => l.location === loc).map(demoOut) };
+  if (action === 'open') {
+    const l = find(p.id);
+    if (!l.firstOpenedAt) { l.firstOpenedAt = new Date().toISOString(); l.firstOpenedBy = S.me.name; touch(l); demoLog(l, 'Opened'); }
+    return { lead: demoOut(l), activity: DB.activity[l.id] || [] };
+  }
+  if (action === 'dial') {
+    const l = find(p.id), n = nextCall(l);
+    if (['New', 'Calling'].includes(l.stage) && n <= 3 && !l.calls[n - 1].at) { l.calls[n - 1].at = new Date().toISOString(); demoLog(l, 'Call ' + n + ' started', '', '', l.phone); }
+    return { lead: demoOut(l) };
+  }
+  if (action === 'logCall') {
+    const l = find(p.id), n = nextCall(l), now = new Date().toISOString(), from = l.stage;
+    if (Number(p.call) !== n) throw new Error('Call ' + n + ' is next. Refresh and try again.');
+    l.calls[n - 1] = { n, at: l.calls[n - 1].at || now, outcome: p.outcome, by: S.me.name };
+    if (!l.owner) l.owner = S.me.name;
+    if (p.outcome === 'Spoke to them') { l.stage = 'Contacted'; l.contactedAt = now; }
+    else if (p.outcome === 'Wrong number') { l.stage = 'Lost'; l.lostReason = 'Wrong number'; }
+    else if (n < 3) l.stage = 'Calling';
+    else { l.stage = 'Marketing only'; l.mkt1At = now; }
+    touch(l); demoLog(l, 'Call ' + n + ': ' + p.outcome, from, l.stage);
+    if (l.stage === 'Marketing only') demoLog(l, 'Email: we tried to reach you');
+    return { lead: demoOut(l) };
+  }
+  if (action === 'update') {
+    const l = find(p.id), f = p.fields || {}, from = l.stage;
+    if (f.quality !== undefined) { l.quality = f.quality; demoLog(l, 'Lead quality', '', f.quality); }
+    if (f.stage && f.stage !== l.stage) {
+      if (f.stage === 'Lost' && !f.lostReason) throw new Error('Pick a reason for closing this lead.');
+      if (f.stage === 'Booked' && !f.appointment) throw new Error('Set the intake date and time.');
+      if (f.stage === 'Follow-up later' && !f.followUp) throw new Error('Set the follow-up date.');
+      if (f.stage === 'Lost') l.lostReason = f.lostReason;
+      if (f.stage === 'Booked') l.appointment = new Date(f.appointment).toISOString();
+      if (f.stage === 'Follow-up later') l.followUp = new Date(f.followUp.length === 10 ? f.followUp + 'T10:00' : f.followUp).toISOString();
+      if (f.stage === 'Contacted' && !l.contactedAt) l.contactedAt = new Date().toISOString();
+      l.stage = f.stage; if (!l.owner) l.owner = S.me.name;
+      demoLog(l, 'Stage changed', from, l.stage, f.lostReason || '');
+      const email = { 'Follow-up later': 'information', 'Booked': 'booking confirmation', 'No-show': 'reschedule', 'Registered': 'registration confirmed' }[l.stage];
+      if (email) demoLog(l, 'Email event sent: ' + email);
+    } else if (l.stage === 'Booked' && f.appointment) { l.appointment = new Date(f.appointment).toISOString(); demoLog(l, 'Intake moved', '', '', f.appointment); }
+    if (f.note && f.note.trim()) {
+      const d = new Date(), p2 = n => String(n).padStart(2, '0');
+      const line = d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()) + ' ' + S.me.name + ': ' + f.note.trim();
+      l.notes = l.notes ? l.notes + '\n' + line : line; demoLog(l, 'Note', '', '', f.note.trim());
+    }
+    touch(l);
+    return { lead: demoOut(l) };
+  }
+  if (action === 'addLead') {
+    const x = p.lead || {};
+    if (!String(x.firstName || '').trim()) throw new Error('First name is required.');
+    if (!String(x.phone || '').trim() && !String(x.email || '').trim()) throw new Error('Add a phone number or an email.');
+    const id = (loc === 'Hanover' ? 'HN-' : 'GT-') + Math.random().toString(36).slice(2, 8).toUpperCase();
+    const l = { id, location: loc, firstName: x.firstName.trim(), lastName: (x.lastName || '').trim(), phone: x.phone, email: x.email || '', reason: x.reason || '', source: 'Manual: ' + (x.source || 'Other'), channel: 'Manual', created: new Date().toISOString(), stage: 'New', lostReason: '', quality: '', owner: S.me.name, firstOpenedAt: null, firstOpenedBy: '', calls: [1, 2, 3].map(n => ({ n, at: null, outcome: '', by: '' })), contactedAt: null, followUp: null, appointment: null, notes: '', welcomeAt: null, mkt1At: null, mkt2At: null, submissions: 1 };
+    DB.leads.push(l); demoLog(l, 'Lead added by hand', '', 'New', x.source);
+    return { lead: demoOut(l) };
+  }
+  throw new Error('Unknown action.');
+}
+
+/* ---------------- Sign in / out ---------------- */
+function renderGate(msg) {
+  const app = $('#app');
+  if (DEMO) {
+    app.innerHTML = '<main class="gate"><div class="gate-card"><h1>Vanguard lead desk</h1>' +
+      '<p>This is a demo with sample leads. Nothing you do here is saved or sent.</p>' +
+      '<div class="demo-row"><button class="btn primary" data-demo="Georgetown">Open Georgetown demo</button>' +
+      '<button class="btn" data-demo="Hanover">Open Hanover demo</button></div></div></main>';
+    return;
+  }
+  app.innerHTML = '<main class="gate"><div class="gate-card"><h1>Vanguard lead desk</h1>' +
+    '<p>Sign in with the Google account your manager approved.</p><div id="gsi"></div>' +
+    (msg ? '<p class="err">' + esc(msg) + '</p>' : '') + '</div></main>';
+  const go = () => {
+    google.accounts.id.initialize({ client_id: CONFIG.GOOGLE_CLIENT_ID, callback: r => { S.token = r.credential; boot(); }, auto_select: false });
+    google.accounts.id.renderButton($('#gsi'), { theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular' });
+  };
+  if (window.google && google.accounts) go();
+  else {
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.onload = go;
+    document.head.appendChild(s);
+  }
+}
+function signOut(msg) {
+  S.token = null; S.me = null; S.leads = []; S.selected = null; S.detail = null;
+  clearInterval(boot.poll); clearInterval(boot.tick);
+  if (!DEMO && window.google && google.accounts) google.accounts.id.disableAutoSelect();
+  renderGate(msg);
+}
+let idleTimer;
+function resetIdle() {
+  clearTimeout(idleTimer);
+  if (!S.me) return;
+  idleTimer = setTimeout(() => signOut('Signed out after ' + CONFIG.IDLE_MINUTES + ' minutes without activity.'), CONFIG.IDLE_MINUTES * 6e4);
+}
+['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, resetIdle, { passive: true }));
+
+async function boot(demoLoc) {
+  try {
+    if (DEMO) {
+      if (!DB) demoSeed();
+      S.location = demoLoc;
+      S.me = { name: 'You (demo)', email: 'demo@example.com', role: 'Lead', location: demoLoc, canSwitch: true, locations: ['Georgetown', 'Hanover'], hours: HOURS_SEED, closedDates: CLOSED_SEED };
+    } else {
+      S.me = await api('me');
+      S.location = S.me.location;
+    }
+    await loadList();
+    resetIdle();
+    clearInterval(boot.tick); boot.tick = setTimeout(function tick() { render(); boot.tick = setTimeout(tick, 30000); }, 30000);
+    if (!DEMO) { clearInterval(boot.poll); boot.poll = setInterval(() => loadList(true), CONFIG.REFRESH_SECONDS * 1000); }
+  } catch (e) {
+    if (S.token || DEMO) renderGate(e.message);
+  }
+}
+async function loadList(quiet) {
+  try {
+    const out = await api('list');
+    S.leads = out.leads;
+    render();
+  } catch (e) { if (!quiet) toast(e.message, true); }
+}
+
+/* ---------------- Derived views ---------------- */
+function inQueue(l) {
+  if (!l.nextDue) return false;
+  if (l.stage === 'Follow-up later') { const end = new Date(); end.setHours(23, 59, 59, 999); return new Date(l.nextDue) <= end; }
+  return ['New', 'Calling'].includes(l.stage);
+}
+function visibleLeads() {
+  const list = S.filter === 'queue' ? S.leads.filter(inQueue) : S.leads.filter(l => l.stage === S.filter);
+  if (S.filter === 'queue') return list.sort((a, b) => new Date(a.nextDue) - new Date(b.nextDue));
+  return list.sort((a, b) => new Date(b.created) - new Date(a.created));
+}
+function dueChip(l) {
+  if (!l.nextDue) return '';
+  const due = new Date(l.nextDue), diff = (due - Date.now()) / 6e4;
+  const what = l.stage === 'Follow-up later' ? 'Follow-up' : 'Call ' + nextCall(l);
+  if (diff < 0) {
+    const m = Math.round(-diff);
+    return '<span class="due late">' + what + ' overdue ' + (m < 60 ? m + ' min' : Math.round(m / 60) + ' h') + '</span>';
+  }
+  if (diff <= 10) return '<span class="due soon">' + what + ' due in ' + Math.max(1, Math.round(diff)) + ' min</span>';
+  return '<span class="due">' + what + ' due ' + fmtWhen(due) + '</span>';
+}
+function callTags(l) {
+  return l.calls.filter(c => c.outcome).map(c =>
+    '<span class="tag' + (c.outcome === 'Spoke to them' ? ' ok' : '') + '">Call ' + c.n + ': ' + esc(c.outcome) + ', ' + fmtTime(c.at) + '</span>').join('');
+}
+function counts() {
+  const c = { queue: S.leads.filter(inQueue).length };
+  MAIN_PATH.concat(SIDE).forEach(s => { c[s] = S.leads.filter(l => l.stage === s).length; });
+  return c;
+}
+function stats() {
+  const due = S.leads.filter(inQueue);
+  const overdue = due.filter(l => new Date(l.nextDue) < Date.now()).length;
+  const nextHour = due.filter(l => { const d = new Date(l.nextDue) - Date.now(); return d >= 0 && d <= 36e5; }).length;
+  const weekAgo = Date.now() - 7 * 864e5;
+  const recent = S.leads.filter(l => new Date(l.created) >= weekAgo);
+  const timed = recent.filter(l => l.calls[0].at);
+  const onTime = timed.filter(l => new Date(l.calls[0].at) <= call1Due(S.location, l.created)).length;
+  return { overdue, nextHour, onTime: timed.length ? Math.round(onTime / timed.length * 100) + '%' : 'n/a' };
+}
+
+/* ---------------- Render ---------------- */
+function render() {
+  if (!S.me) return;
+  const c = counts(), st = stats();
+  const title = S.filter === 'queue' ? 'Call now' : S.filter;
+  const leads = visibleLeads();
+  const locCtl = S.me.canSwitch
+    ? '<span class="loc"><label class="sr" for="locsel">Location</label><select id="locsel">' + S.me.locations.map(x => '<option' + (x === S.location ? ' selected' : '') + '>' + x + '</option>').join('') + '</select></span>'
+    : '<span class="loc">' + esc(S.location) + '</span>';
+
+  $('#app').innerHTML =
+    '<header class="bar"><span class="brand">Vanguard lead desk</span>' + locCtl +
+    (DEMO ? '<span class="demo-flag">Demo, sample data</span>' : '') +
+    '<span class="spacer"></span><span class="who">' + esc(S.me.name) + '</span>' +
+    '<button class="btn" data-act="add">Add lead</button><button class="btn ghost" data-act="signout">Sign out</button></header>' +
+
+    '<nav class="rail" aria-label="Lead funnel"><div class="path">' +
+      seg('queue', 'Call now', c.queue, RULES.queue, true) +
+      MAIN_PATH.map(s => seg(s, s, c[s], RULES[s])).join('') +
+    '</div><div class="side">' + SIDE.map(s => pill(s, c[s])).join('') + '</div></nav>' +
+
+    '<div class="work"><section class="list" aria-label="' + esc(title) + '">' +
+      '<div class="list-head"><h2>' + esc(title) + '</h2><p>' + esc(RULES[S.filter]) + '</p>' +
+        (S.filter === 'queue' ? '<div class="stats"><span class="stat' + (st.overdue ? ' bad' : '') + '"><b>' + st.overdue + '</b> overdue</span>' +
+          '<span class="stat"><b>' + st.nextHour + '</b> due in the next hour</span>' +
+          '<span class="stat"><b>' + st.onTime + '</b> call 1 on time, last 7 days</span></div>' : '') +
+      '</div>' +
+      (leads.length ? '<ul class="rows">' + leads.map(rowHtml).join('') + '</ul>'
+        : '<div class="empty">' + (S.filter === 'queue' ? 'Nobody is due for a call right now. New leads will appear here as they arrive.' : 'No leads in ' + esc(S.filter) + ' right now.') + '</div>') +
+    '</section>' + panelHtml() + '</div>';
+}
+function seg(key, label, n, rule, isQueue) {
+  return '<button class="seg' + (isQueue ? ' callnow' : '') + '" data-filter="' + esc(key) + '" aria-pressed="' + (S.filter === key) + '">' +
+    '<div class="n">' + n + '</div><div class="t">' + esc(label) + '</div><div class="r">' + esc(rule) + '</div></button>';
+}
+function pill(s, n) {
+  return '<button class="pill" data-filter="' + esc(s) + '" aria-pressed="' + (S.filter === s) + '" title="' + esc(RULES[s]) + '">' +
+    '<span class="n">' + n + '</span><span class="t">' + esc(s) + '</span><span class="r">' + esc(RULES[s]) + '</span></button>';
+}
+function rowHtml(l) {
+  const meta = [l.reason, l.source, 'received ' + ago(l.created)].filter(Boolean).map(esc).join(', ');
+  const extra = (S.filter === 'queue' ? '' : '<span class="tag">' + esc(l.stage === 'Lost' && l.lostReason ? 'Lost: ' + l.lostReason : l.stage) + '</span>') +
+    (l.stage === 'Booked' && l.appointment ? '<span class="tag ok">Intake ' + fmtWhen(l.appointment) + '</span>' : '');
+  return '<li><button class="row" data-open="' + esc(l.id) + '" aria-current="' + (S.selected === l.id) + '">' +
+    '<div class="top"><span class="name">' + esc(fullName(l)) + '</span>' + dueChip(l) + '</div>' +
+    '<div class="meta">' + meta + '</div>' +
+    '<div class="tags">' + (l.submissions > 1 ? '<span class="tag again">Submitted ' + l.submissions + ' times</span>' : '') + callTags(l) + extra + '</div>' +
+    '</button></li>';
+}
+function panelHtml() {
+  const l = S.detail;
+  if (!l) {
+    return '<aside class="panel" aria-label="Lead details"><div class="blank"><h3>Pick a lead</h3>' +
+      '<p>Start with Call now. Opening a lead records the time you opened it, and tapping the number records when you dialled.</p></div></aside>';
+  }
+  const n = nextCall(l);
+  const callable = ['New', 'Calling'].includes(l.stage) && n <= 3;
+  const steps = NEXT_STEPS[l.stage] || [];
+  const facts = [
+    ['Reason', l.reason], ['Source', l.source + (l.channel ? ', ' + l.channel : '')],
+    ['Received', fmtWhen(l.created)], ['First opened', l.firstOpenedAt ? fmtWhen(l.firstOpenedAt) + ' by ' + l.firstOpenedBy : 'Not yet'],
+    ['Owner', l.owner || 'Unassigned'], ['Lead ID', l.id]
+  ];
+  if (l.appointment) facts.push(['Intake', fmtWhen(l.appointment)]);
+  if (l.followUp && l.stage === 'Follow-up later') facts.push(['Follow-up', fmtWhen(l.followUp)]);
+  if (l.lostReason && l.stage === 'Lost') facts.push(['Closed because', l.lostReason]);
+  if (l.submissions > 1) facts.push(['Submitted', l.submissions + ' times']);
+
+  const emails = [['Welcome', l.welcomeAt], ['We tried to reach you', l.mkt1At], ['Check-in', l.mkt2At]].filter(e => e[1]);
+
+  return '<aside class="panel open" aria-label="Lead details">' +
+    '<div class="p-head"><div><h2>' + esc(fullName(l)) + '</h2><span class="stage">' + esc(l.stage) + '</span></div>' +
+    '<button class="btn ghost close" data-act="close" aria-label="Close lead">Close</button></div>' +
+    '<div class="p-body">' +
+      '<div class="contact">' + (l.phone ? '<a class="dial" href="tel:' + esc(l.phone) + '" data-act="dial">Call ' + esc(phonePretty(l.phone)) + '</a>' : '') +
+        (l.email ? '<a class="mail" href="mailto:' + esc(l.email) + '">' + esc(l.email) + '</a>' : '') + '</div>' +
+      '<dl class="facts">' + facts.map(f => '<div><dt>' + esc(f[0]) + '</dt><dd>' + esc(f[1]) + '</dd></div>').join('') + '</dl>' +
+
+      (callable ? '<div class="block"><h3>Call ' + n + ' of 3</h3><p class="hint">' + (l.nextDue ? dueChip(l) + ' ' : '') +
+        'How did it go?</p><div class="outcomes">' +
+        '<button class="outcome good" data-outcome="Spoke to them">Spoke to them</button>' +
+        '<button class="outcome" data-outcome="No answer">No answer</button>' +
+        '<button class="outcome" data-outcome="Voicemail left">Voicemail left</button>' +
+        '<button class="outcome" data-outcome="Busy, call back">Busy, call back</button>' +
+        '<button class="outcome bad" data-outcome="Wrong number">Wrong number</button></div>' +
+        (n === 3 ? '<p class="hint" style="margin-top:10px">If call 3 goes unanswered, the lead moves to Marketing only and gets the "we tried to reach you" email.</p>' : '') +
+      '</div>' : '') +
+
+      (l.calls.some(c => c.at) ? '<div class="block"><h3>Calls</h3><ul class="calllog">' + l.calls.filter(c => c.at).map(c =>
+        '<li><b>Call ' + c.n + '</b> ' + (c.outcome ? esc(c.outcome) : 'dialled, outcome not logged') + ', ' + fmtWhen(c.at) + (c.by ? ' by ' + esc(c.by) : '') + '</li>').join('') + '</ul></div>' : '') +
+
+      (steps.length ? '<div class="block"><h3>Next step</h3><div class="steps">' + steps.map(s =>
+        '<button class="step" data-step="' + esc(s) + '" aria-pressed="' + (S.step === s) + '">' + esc(STEP_LABEL[s](l.stage)) + '</button>').join('') +
+        (l.stage === 'Booked' ? '<button class="step" data-step="reschedule" aria-pressed="' + (S.step === 'reschedule') + '">Move intake</button>' : '') +
+        '</div>' + stepForm(l) + '</div>' : '') +
+
+      (!['New', 'Calling'].includes(l.stage) ? '<div class="block"><h3>Lead quality</h3><p class="hint">Your read on this person after speaking to them.</p><div class="seg-ctl" role="group" aria-label="Lead quality">' +
+        ['Good', 'OK', 'Poor'].map(q => '<button data-quality="' + q + '" aria-pressed="' + (l.quality === q) + '">' + q + '</button>').join('') + '</div></div>' : '') +
+
+      '<div class="block"><h3>Notes</h3><label class="sr" for="note">Add a note</label><textarea id="note" placeholder="What did they say? What happens next?"></textarea>' +
+        '<div style="margin-top:8px"><button class="btn small" data-act="note">Add note</button></div>' +
+        (l.notes ? '<div class="notes">' + esc(l.notes) + '</div>' : '') + '</div>' +
+
+      (emails.length ? '<div class="block"><h3>Emails sent</h3><ul class="log">' + emails.map(e => '<li><time>' + fmtWhen(e[1]) + '</time>' + esc(e[0]) + '</li>').join('') + '</ul></div>' : '') +
+
+      (S.activity.length ? '<div class="block"><h3>Activity</h3><ul class="log">' + S.activity.slice(0, 20).map(a =>
+        '<li><time>' + fmtWhen(a.at) + '</time>' + esc(a.staff) + ': ' + esc(a.action) + (a.to ? ' (' + esc(a.from ? a.from + ' to ' + a.to : a.to) + ')' : '') + (a.detail ? ', ' + esc(a.detail) : '') + '</li>').join('') + '</ul></div>' : '') +
+    '</div></aside>';
+}
+function stepForm(l) {
+  const s = S.step;
+  if (!s) return '';
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(10, 0, 0, 0);
+  if (s === 'Booked' || s === 'reschedule') {
+    const v = l.appointment ? localInputValue(l.appointment) : localInputValue(tomorrow);
+    return '<div class="form"><label>Intake date and time<input type="datetime-local" id="appt" value="' + v + '"></label>' +
+      '<div id="apptwarn">' + warnHtml(doctorWarning(S.location, v)) + '</div>' +
+      '<div><button class="btn primary" data-confirm="' + esc(s) + '">' + (s === 'reschedule' ? 'Move intake' : 'Book intake') + '</button></div></div>';
+  }
+  if (s === 'Follow-up later') {
+    return '<div class="form"><label>Call them again on<input type="datetime-local" id="fu" value="' + localInputValue(tomorrow) + '"></label>' +
+      '<div><button class="btn primary" data-confirm="Follow-up later">Set follow-up</button></div></div>';
+  }
+  if (s === 'Lost') {
+    const reasons = (S.me.lostReasons || ['Not interested', 'Found another doctor', 'Outside catchment', 'Wrong location', 'Wrong number', 'Duplicate', 'Spam, fake or test']);
+    return '<div class="form"><label>Why is this lead closing?<select id="lost"><option value="">Pick a reason</option>' +
+      reasons.map(r => '<option>' + esc(r) + '</option>').join('') + '</select></label>' +
+      '<div><button class="btn primary" data-confirm="Lost">Close lead</button></div></div>';
+  }
+  const label = STEP_LABEL[s](l.stage);
+  return '<div class="form"><p style="margin:0">Move to <b>' + esc(s) + '</b>?</p><div><button class="btn primary" data-confirm="' + esc(s) + '">' + esc(label) + '</button></div></div>';
+}
+const warnHtml = w => w ? '<div class="warn">' + esc(w) + '</div>' : '';
+
+/* ---------------- Actions ---------------- */
+async function openLead(id) {
+  S.selected = id; S.step = null;
+  S.detail = S.leads.find(l => l.id === id) || null; S.activity = [];
+  render();
+  try {
+    const out = await api('open', { id });
+    applyLead(out.lead); S.activity = out.activity || []; render();
+  } catch (e) { toast(e.message, true); }
+}
+function applyLead(lead) {
+  const i = S.leads.findIndex(l => l.id === lead.id);
+  if (i === -1) S.leads.push(lead); else S.leads[i] = lead;
+  if (S.selected === lead.id) S.detail = lead;
+}
+async function refreshActivity() {
+  if (!S.selected) return;
+  try { const out = await api('open', { id: S.selected }); applyLead(out.lead); S.activity = out.activity || []; } catch (e) { /* keep current */ }
+}
+async function run(fn, okMsg) {
+  if (S.busy) return;
+  S.busy = true;
+  try { const out = await fn(); if (out && out.lead) applyLead(out.lead); await refreshActivity(); S.step = null; render(); if (okMsg) toast(okMsg); }
+  catch (e) { toast(e.message, true); }
+  finally { S.busy = false; }
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-demo],[data-filter],[data-open],[data-act],[data-outcome],[data-step],[data-confirm],[data-quality]');
+  if (!t) return;
+  if (t.dataset.demo) return boot(t.dataset.demo);
+  if (t.dataset.filter) { S.filter = t.dataset.filter; render(); return; }
+  if (t.dataset.open) return openLead(t.dataset.open);
+  const l = S.detail;
+  if (t.dataset.outcome && l) {
+    const n = nextCall(l), o = t.dataset.outcome;
+    const msg = o === 'Spoke to them' ? 'Moved to Contacted' : o === 'Wrong number' ? 'Closed as wrong number' : n === 3 ? 'No answer to 3 calls. Moved to Marketing only' : 'Call ' + n + ' logged. Call ' + (n + 1) + ' is now due';
+    return run(() => api('logCall', { id: l.id, call: n, outcome: o }), msg);
+  }
+  if (t.dataset.step) { S.step = S.step === t.dataset.step ? null : t.dataset.step; render(); return; }
+  if (t.dataset.confirm && l) {
+    const s = t.dataset.confirm, fields = {};
+    if (s === 'reschedule') { fields.appointment = ($('#appt') || {}).value; if (!fields.appointment) return toast('Set the intake date and time.', true); return run(() => api('update', { id: l.id, fields }), 'Intake moved'); }
+    fields.stage = s;
+    if (s === 'Booked') fields.appointment = ($('#appt') || {}).value;
+    if (s === 'Follow-up later') fields.followUp = ($('#fu') || {}).value;
+    if (s === 'Lost') { fields.lostReason = ($('#lost') || {}).value; if (!fields.lostReason) return toast('Pick a reason for closing this lead.', true); }
+    return run(() => api('update', { id: l.id, fields }), 'Moved to ' + s);
+  }
+  if (t.dataset.quality && l) {
+    const q = l.quality === t.dataset.quality ? '' : t.dataset.quality;
+    return run(() => api('update', { id: l.id, fields: { quality: q } }), q ? 'Lead quality: ' + q : 'Lead quality cleared');
+  }
+  switch (t.dataset.act) {
+    case 'signout': return signOut();
+    case 'close': S.selected = null; S.detail = null; S.step = null; return render();
+    case 'add': return openAddDialog();
+    case 'note': {
+      const v = ($('#note') || {}).value || '';
+      if (!v.trim()) return toast('Write a note first.', true);
+      return run(() => api('update', { id: l.id, fields: { note: v } }), 'Note added');
+    }
+    case 'dial': if (l) api('dial', { id: l.id }).then(out => { applyLead(out.lead); render(); }).catch(() => {}); return; // let the tel: link dial
+  }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'locsel') { S.location = e.target.value; S.selected = null; S.detail = null; S.filter = 'queue'; loadList(); }
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'appt') { const w = $('#apptwarn'); if (w) w.innerHTML = warnHtml(doctorWarning(S.location, e.target.value)); }
+});
+
+function openAddDialog() {
+  let d = $('#adddlg');
+  if (!d) { d = document.createElement('dialog'); d.id = 'adddlg'; d.className = 'dlg'; document.body.appendChild(d); }
+  d.innerHTML = '<form method="dialog" id="addform"><h2>Add a lead</h2>' +
+    '<p style="margin:0;color:var(--ink-2);font-size:14px">For walk-ins and phone calls. It goes straight into ' + esc(S.location) + "'s list as New.</p>" +
+    '<div class="two"><label>First name<input name="firstName" required autocomplete="off"></label><label>Last name<input name="lastName" autocomplete="off"></label></div>' +
+    '<label>Phone<input name="phone" type="tel" autocomplete="off"></label><label>Email<input name="email" type="email" autocomplete="off"></label>' +
+    '<label>What do they need?<select name="reason"><option>New patient registration</option><option>Learn more before registering</option><option>Pharmacy question</option><option>Other</option></select></label>' +
+    '<label>How did they reach us?<select name="source"><option>Walk-in</option><option>Phone call</option><option>Referral</option><option>Other</option></select></label>' +
+    '<div class="actions"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="save">Add lead</button></div></form>';
+  d.showModal();
+  d.onclose = () => {
+    if (d.returnValue !== 'save') return;
+    const f = new FormData($('#addform')); const lead = Object.fromEntries(f.entries());
+    run(async () => { const out = await api('addLead', { lead }); S.filter = 'queue'; S.selected = out.lead.id; S.detail = out.lead; return out; }, 'Lead added');
+  };
+}
+
+async function start() {
+  const forceDemo = new URLSearchParams(location.search).has('demo');
+  if (!forceDemo && location.protocol.startsWith('http')) {
+    try {
+      const res = await fetch('/api/config', { cache: 'no-store' });
+      if (res.ok) {
+        const cfg = await res.json();
+        if (cfg.googleClientId) { CONFIG.GOOGLE_CLIENT_ID = cfg.googleClientId; CONFIG.IDLE_MINUTES = cfg.idleMinutes || 30; DEMO = false; }
+      }
+    } catch (e) { /* no server: demo mode */ }
+  }
+  if (!DEMO && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+  renderGate();
+}
+start();
+</script>
+</body>
+</html>
