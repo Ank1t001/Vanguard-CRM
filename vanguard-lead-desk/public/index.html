@@ -196,6 +196,9 @@ button:disabled{cursor:not-allowed; opacity:.5}
 .outcomes,.steps{display:flex; gap:var(--s2); flex-wrap:wrap}
 .outcome,.step{min-height:var(--tap); border:1px solid var(--line-2); background:var(--panel); border-radius:var(--r-sm); padding:0 var(--s4); font-weight:600; font-size:var(--fs-sm)}
 .outcome:hover,.step:hover{border-color:var(--primary)}
+.panel[aria-busy="true"] .p-body button,.panel[aria-busy="true"] .p-body .dial{pointer-events:none}
+.panel[aria-busy="true"] .p-body .step,.panel[aria-busy="true"] .p-body .btn{opacity:.6}
+.outcome:disabled{opacity:.55}
 .block.focus{padding:var(--s4); border:1px solid var(--primary-line); background:var(--primary-soft); border-radius:var(--r)}
 .block.focus .step{background:var(--panel)}
 .step[aria-pressed="true"]{border-color:var(--primary); background:var(--primary-soft); color:var(--primary)}
@@ -749,13 +752,27 @@ function stats() {
 }
 
 /* ---------------- Render ---------------- */
+// Redraws the screen. Anything typed into a box (a note, a date, a correction)
+// and the cursor position survive the redraw, so the automatic refresh never
+// wipes half-written work. After a successful save, S.clearInputs resets them.
+const fieldKey = el => el.id || (el.name ? 'n:' + el.name : '');
 function render() {
   if (!S.me) return;
-  const qEl = document.activeElement && document.activeElement.id === 'q' ? document.activeElement : null;
-  const caret = qEl ? [qEl.selectionStart, qEl.selectionEnd] : null;
+  const keep = {};
+  if (!S.clearInputs) document.querySelectorAll('#app input, #app textarea, #app select').forEach(el => { const k = fieldKey(el); if (k && k !== 'q') keep[k] = el.value; });
+  S.clearInputs = false;
+  const a = document.activeElement;
+  const focusKey = a && a.closest && a.closest('#app') ? fieldKey(a) : '';
+  let caret = null; try { if (focusKey) caret = [a.selectionStart, a.selectionEnd]; } catch (e) { /* not a text box */ }
+  // Scroll positions of the lead list and the open lead (full screen on phones).
+  const scrolls = ['.rows', '.panel.open'].map(sel => { const el = $(sel); return el ? el.scrollTop : 0; });
   const main = S.view === 'unassigned' ? unassignedHtml() : S.view === 'report' ? reportHtml() : leadsHtml();
   $('#app').innerHTML = barHtml() + main;
-  if (caret) { const el = $('#q'); if (el) { el.focus(); try { el.setSelectionRange(caret[0], caret[1]); } catch (e) { /* ignore */ } } }
+  ['.rows', '.panel.open'].forEach((sel, i) => { const el = $(sel); if (el) el.scrollTop = scrolls[i]; });
+  if (S.scrollPanelTop) { S.scrollPanelTop = false; const el = $('.panel.open'); if (el) el.scrollTop = 0; if (window.innerWidth > 860 && el) el.scrollIntoView({ block: 'nearest' }); }
+  const find = k => k.startsWith('n:') ? document.querySelector('#app [name="' + k.slice(2) + '"]') : document.getElementById(k);
+  for (const k in keep) { const el = find(k); if (el && !el.disabled) el.value = keep[k]; }
+  if (focusKey) { const el = find(focusKey); if (el) { el.focus(); if (caret && caret[0] != null) try { el.setSelectionRange(caret[0], caret[1]); } catch (e) { /* ignore */ } } }
 }
 function barHtml() {
   const locCtl = S.me.canSwitch
@@ -896,7 +913,7 @@ function panelHtml() {
 
   const emails = [['Welcome', l.welcomeAt], ['We tried to reach you', l.mkt1At], ['Check-in', l.mkt2At]].filter(e => e[1]);
 
-  return '<aside class="panel open" aria-label="Lead details">' +
+  return '<aside class="panel open" aria-label="Lead details" aria-busy="' + !!S.busy + '">' +
     '<div class="p-head"><button class="btn ghost small back" data-act="close">&larr; Back to list</button>' +
     '<div><h2>' + esc(fullName(l)) + '</h2><span class="stage">' + esc(l.stage) + '</span></div>' +
     '<button class="btn ghost small close" data-act="close" aria-label="Close lead">Close</button></div>' +
@@ -913,7 +930,7 @@ function panelHtml() {
       (callable ? '<div class="block"><h3>Call ' + n + ' of 3</h3><p class="hint">' + (l.nextDue ? dueChip(l) + ' ' : '') +
         'Tap what happened on this call. Nothing is saved until you tap.</p><div class="outcomes">' +
         ['No answer', 'Voicemail left', 'Busy, call back', 'Spoke to them', 'Wrong number'].map(o =>
-          '<button class="outcome" data-outcome="' + o + '">' + o + '</button>').join('') + '</div>' +
+          '<button class="outcome" data-outcome="' + o + '"' + (S.busy ? ' disabled' : '') + '>' + (S.pending === o ? 'Saving...' : o) + '</button>').join('') + '</div>' +
         (n === 3 ? '<p class="hint">If call 3 goes unanswered, the lead moves to Marketing only and gets the "we tried to reach you" email.</p>' : '') +
       '</div>' : '') +
 
@@ -988,7 +1005,7 @@ const warnHtml = w => w ? '<div class="warn">' + esc(w) + '</div>' : '';
 
 /* ---------------- Actions ---------------- */
 async function openLead(id) {
-  S.selected = id; S.step = null; S.editing = false; S.justSpoke = null;
+  S.selected = id; S.step = null; S.editing = false; S.justSpoke = null; S.clearInputs = true; S.scrollPanelTop = true;
   S.detail = S.leads.find(l => l.id === id) || (S.results || []).find(l => l.id === id) || null; S.activity = []; S.team = [];
   render();
   try {
@@ -1007,12 +1024,20 @@ async function refreshActivity() {
   if (!S.selected) return;
   try { const out = await api('open', { id: S.selected }); applyLead(out.lead); S.activity = out.activity || []; S.team = out.team || []; } catch (e) { /* keep current */ }
 }
-async function run(fn, okMsg) {
+// Saves something, showing "Saving..." on the tapped button at once. The lead
+// updates as soon as the save returns; the activity list reloads afterwards.
+async function run(fn, okMsg, opts) {
   if (S.busy) return;
-  S.busy = true;
-  try { const out = await fn(); if (out && out.lead) applyLead(out.lead); await refreshActivity(); S.step = null; S.editing = false; render(); if (okMsg) toast(okMsg); }
-  catch (e) { toast(e.message, true); }
-  finally { S.busy = false; }
+  S.busy = true; S.pending = (opts && opts.pending) || null; render();
+  try {
+    const out = await fn();
+    if (out && out.lead) applyLead(out.lead);
+    S.step = null; S.editing = false; S.clearInputs = true;
+    if (opts && opts.after) opts.after(out);
+    S.busy = false; S.pending = null; render();
+    if (okMsg) toast(okMsg);
+    refreshActivity().then(render);
+  } catch (e) { S.busy = false; S.pending = null; render(); toast(e.message, true); }
 }
 
 document.addEventListener('click', e => {
@@ -1040,8 +1065,9 @@ document.addEventListener('click', e => {
   if (t.dataset.outcome && l) {
     const n = nextCall(l), o = t.dataset.outcome;
     const msg = o === 'Spoke to them' ? 'Moved to Contacted' : o === 'Wrong number' ? 'Closed as wrong number' : n === 3 ? 'No answer to 3 calls. Moved to Marketing only' : 'Call ' + n + ' logged. Call ' + (n + 1) + ' is now due';
-    return run(() => api('logCall', { id: l.id, call: n, outcome: o }), msg).then(() => {
-      if (o === 'Spoke to them' && S.detail && S.detail.stage === 'Contacted') { S.justSpoke = S.detail.id; render(); }
+    return run(() => api('logCall', { id: l.id, call: n, outcome: o }), msg, {
+      pending: o,
+      after: out => { if (o === 'Spoke to them' && out && out.lead && out.lead.stage === 'Contacted') { S.justSpoke = out.lead.id; S.scrollPanelTop = true; } }
     });
   }
   if (t.dataset.step) { S.step = S.step === t.dataset.step ? null : t.dataset.step; render(); return; }
@@ -1060,7 +1086,7 @@ document.addEventListener('click', e => {
   }
   switch (t.dataset.act) {
     case 'signout': return signOut();
-    case 'close': S.selected = null; S.detail = null; S.step = null; return render();
+    case 'close': S.selected = null; S.detail = null; S.step = null; S.clearInputs = true; return render();
     case 'add': return openAddDialog();
     case 'editdetails': S.editing = !S.editing; return render();
     case 'savedetails': {
